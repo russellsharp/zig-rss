@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title> </title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="header">
+        <div class="header-text">
+          <p id="serviceInfo">Loading config…</p>
+        </div>
+        <button id="refreshBtn" type="button">Refresh</button>
+      </header>
+
+      <div class="list-shell">
+        <ul id="entryList" aria-live="polite"></ul>
+      </div>
+
+      <footer>
+        <p id="statusText">Waiting for first refresh…</p>
+      </footer>
+    </div>
+
+    <script src="./renderer.js"></script>
+  </body>
+</html>

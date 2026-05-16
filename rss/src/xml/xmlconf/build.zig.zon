@@ -1,0 +1,20 @@
+.{
+    .name = .xmlconf,
+    .version = "0.0.0",
+    .fingerprint = 0x9ff4914e2b429b9b, // Changing this has security and trust implications.
+    .minimum_zig_version = "0.15.1",
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+    .dependencies = .{
+        .xml = .{
+            .path = "..",
+        },
+        .xmlts = .{
+            .url = "https://www.w3.org/XML/Test/xmlts20130923.tar.gz",
+            .hash = "N-V-__8AAKKMKQAyL3KQidU3H84LB3ftuZRsxUo4mqNyyHnZ",
+        },
+    },
+}

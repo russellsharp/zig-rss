@@ -1,0 +1,42 @@
+{
+  "serviceUrl": "http://127.0.0.1:8089/rss",  
+    "refreshIntervalMinutes": 30,
+    "refreshIntervalFailedMinutes": 5,
+  "requests": [
+      {
+          "url": "https://www.democracynow.org/podcast.xml",
+          "item_limit": "10",
+          "age_limit_hours": 72
+      },
+      {
+          "url": "https://notado.app/rss/jado/software-development/feed.rss",
+          "item_limit": "10",
+          "age_limit_hours": 72
+      },
+      {
+          "url": "https://news.usni.org/feed",
+          "item_limit": "10",
+          "age_limit_hours": 72
+      },
+      {
+          "url": "https://www.naval-technology.com/news/feed/",
+          "item_limit": "10",
+          "age_limit_hours": 72
+      },
+      {
+          "url": "http://feeds.hanselman.com/ScottHanselman",
+          "item_limit": 10,
+          "age_limit_hours": 72
+      },
+      {
+          "url": "https://www.thecrazyprogrammer.com/feed",
+          "item_limit": 10,
+          "age_limit_hours": 72
+      },
+      {
+          "url": "https://blog.codepen.io/feed/",
+          "item_limit": 10,
+          "age_limit_hours": 20
+      }
+  ]
+}

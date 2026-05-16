@@ -1,0 +1,31 @@
+.{
+    .name = .xml_bench,
+    .version = "0.0.0",
+    .fingerprint = 0xf7a84882b8ff81a4, // Changing this has security and trust implications.
+    .minimum_zig_version = "0.15.1",
+    .paths = .{
+        "src",
+        "lib",
+        "build.zig",
+        "build.zig.zon",
+    },
+    .dependencies = .{
+        .xml = .{
+            .path = "..",
+        },
+        .libxml2 = .{
+            .url = "git+https://github.com/ianprime0509/zig-libxml2?ref=main#1c0b9f4ed973dd78644dd424f1ed89aa1a1d86fb",
+            .hash = "libxml2-2.12.6-0-_uu2QVJdAADU16e2xNca0zQyk3Lszmb6tfJESRcimhhn",
+        },
+        .mxml = .{
+            .url = "git+https://github.com/michaelrsweet/mxml.git#809204a3051607f54b57e2950f3a5520d79ae383",
+            .hash = "N-V-__8AANnGIgA8Oy269gMjyQTBhtFkyegDQ_YdwRL2Damw",
+        },
+        .yxml = .{
+            // Upstream: https://g.blicky.net/yxml.git/
+            // Upstream doesn't support Git protocol v2, so Zig cannot currently fetch it
+            .url = "git+https://github.com/ianprime0509/yxml.git#66507906673bc6159d5d620414479954c9c21c24",
+            .hash = "N-V-__8AAAVVAQC7bPAomXJZrTzJUIEMXq0LwNXN5mkVw36I",
+        },
+    },
+}
