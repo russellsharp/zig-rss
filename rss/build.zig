@@ -125,7 +125,7 @@ pub fn build(b: *std.Build) void {
     });
 
     // A run step that will run the test executable.
-    const run_mod_tests = b.addRunArtifact(mod_tests);
+    // const run_mod_tests = b.addRunArtifact(mod_tests);
 
     // Creates an executable that will run `test` blocks from the executable's
     // root module. Note that test executables only test one module at a time,
@@ -169,14 +169,14 @@ pub fn build(b: *std.Build) void {
     buildTestSteps(b, &module_collection, &modules_custom, test_runner);
 
     // A run step that will run the second test executable.
-    const run_exe_tests = b.addRunArtifact(exe_tests);
+    // const run_exe_tests = b.addRunArtifact(exe_tests);
 
     // A top level step for running all tests. dependOn can be called multiple
     // times and since the two run steps do not depend on one another, this will
     // make the two of them run in parallel.
-    const test_step = b.step("test", "Run tests");
-    test_step.dependOn(&run_mod_tests.step);
-    test_step.dependOn(&run_exe_tests.step);
+    // const test_step = b.step("test", "Run tests");
+    // test_step.dependOn(&run_mod_tests.step);
+    // test_step.dependOn(&run_exe_tests.step);
 
     // Just like flags, top level steps are also listed in the `--help` menu.
     //

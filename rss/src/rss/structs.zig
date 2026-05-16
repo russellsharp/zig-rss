@@ -1,5 +1,5 @@
 const std = @import("std");
-const deepCopy = @import("utilities").cloneList;
+const cloneList = @import("utilities").cloneList;
 const deinitList = @import("utilities").deinitList;
 const deinitStruct = @import("utilities").deinitStruct;
 const string = []const u8;
@@ -23,13 +23,10 @@ pub const Summary = struct {
         var s = a.create(Summary) catch unreachable;
         // Prefer the resolved response URL when available (after redirects);
         // otherwise preserve the original request URL for traceability.
-        s.title = if (result.url) |url|
-            a.dupe(u8, url) catch unreachable
-        else
-            a.dupe(u8, result.request.url) catch unreachable;
-        s.entries = deepCopy(a, FeedEntry, result.entries);
+        s.title = a.dupe(u8, result.url orelse result.request.url) catch unreachable;
+        s.entries = cloneList(a, FeedEntry, result.entries);
         s.request = result.request.clone(a);
-        s.errors = deepCopy(a, string, result.errors);
+        s.errors = cloneList(a, string, result.errors);
         return s;
     }
 
@@ -175,12 +172,12 @@ pub const FeedResult = struct {
             .url = if (s.url) |url| a.dupe(u8, url) catch unreachable else null,
             .status = s.status,
             .request = s.request.clone(a),
-            .entries = deepCopy(a, FeedEntry, s.entries),
+            .entries = cloneList(a, FeedEntry, s.entries),
             .body = if (s.body) |body| a.dupe(u8, body) catch unreachable else null,
             // Headers are stored as pointers, so this must deep-copy pointed
             // header instances to keep clone/deinit ownership independent.
-            .headers = if (s.headers) |headers| deepCopy(a, *http.Header, headers) else null,
-            .errors = deepCopy(a, string, s.errors),
+            .headers = if (s.headers) |headers| cloneList(a, *http.Header, headers) else null,
+            .errors = cloneList(a, string, s.errors),
         };
     }
 

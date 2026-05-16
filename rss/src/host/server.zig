@@ -44,6 +44,29 @@ pub const Context = struct {
     }
 };
 
+const RouteHandler = struct {
+    const Self = @This();
+    supported_routes: std.ArrayList([]const u8) = .empty,
+
+    fn init(a: std.mem.Allocator, to_support: []const []const u8) Self {
+        var initialized = Self{};
+        for (to_support) |route| {
+            initialized.supported_routes.append(a, a.dupe(u8, route) catch unreachable) catch unreachable;
+        }
+        return initialized;
+    }
+
+    fn isSupported(s: *Self, route: []const u8) bool {
+        return for (s.supported_routes.items) |item| {
+            if (std.ascii.eqlIgnoreCase(route, item)) break true;
+        } else false;
+    }
+
+    fn deinit(s: *Self, a: std.mem.Allocator) void {
+        utilities.deinitList(s.supported_routes, a);
+    }
+};
+
 pub const Server = struct {
     const Self = @This();
 
@@ -144,9 +167,7 @@ pub const Server = struct {
         try hostUtilities.get_query_parameters(req.head.target, &paramMap);
 
         switch (req.head.method) {
-            .GET => try handle_get(c, &req),
             .POST => try handle_post(c, &req),
-            .HEAD => try handle_head(c, &req),
             else => try req.respond("", .{ .status = .method_not_allowed }),
         }
     }
@@ -165,70 +186,66 @@ pub const Server = struct {
         var req = try server_instance.receiveHead();
 
         try switch (req.head.method) {
-            .GET => handle_get(c, &req),
             .POST => try handle_post(c, &req),
             else => try req.respond("", .{ .status = .method_not_allowed }),
         };
     }
 
-    fn handle_get(c: *Context, req: *http.Server.Request) !void {
-        var body = try c.a.alloc(u8, 8 * 1024);
-        _ = &body;
-        defer c.a.free(body);
-
-        _ = try read_request_body(body, req);
-
-        try req.respond("What\\", .{ .extra_headers = &.{.{ .name = "Content-Type", .value = "text/plain" }} });
-    }
-
     fn handle_post(c: *Context, req: *http.Server.Request) !void {
         var error_message: []const u8 = try c.a.alloc(u8, 0);
         defer c.a.free(error_message);
+
+        var supported_routes: RouteHandler = .init(c.a, &[_][]const u8{"/rss"});
+        defer supported_routes.deinit(c.a);
+
         //headers go away when accessing the body so grab the header info first.
-        if (std.ascii.eqlIgnoreCase(req.head.target, "/rss")) {
-            const content_type = req.head.content_type;
-            if (content_type == null) {
+        if (!supported_routes.isSupported(req.head.target)) {
+            try @constCast(req).respond(error_message, .{ .status = .bad_request, .extra_headers = &.{.{ .name = "Content-Type", .value = "text/plain" }} });
+            return;
+        }
+
+        const content_type = req.head.content_type;
+        if (content_type == null) {
+            error_message = try std.fmt.allocPrint(c.a, "Expects a content type specified, application/json.", .{});
+        } else {
+            const type_content = try ContentType.from_string(req.head.content_type.?);
+
+            if (type_content != ContentType.Json) {
                 error_message = try std.fmt.allocPrint(c.a, "Expects a content type specified, application/json.", .{});
+            } else if (req.head.content_length == null) {
+                error_message = try std.fmt.allocPrint(c.a, "Expects a Content-Length header for the request body.", .{});
             } else {
-                const type_content = try ContentType.from_string(req.head.content_type.?);
+                const req_body = try c.a.alloc(u8, req.head.content_length.?);
+                defer c.a.free(req_body);
 
-                if (type_content != ContentType.Json) {
-                    error_message = try std.fmt.allocPrint(c.a, "Expects a content type specified, application/json.", .{});
-                } else if (req.head.content_length == null) {
-                    error_message = try std.fmt.allocPrint(c.a, "Expects a Content-Length header for the request body.", .{});
-                } else {
-                    const req_body = try c.a.alloc(u8, req.head.content_length.?);
-                    defer c.a.free(req_body);
+                try read_request_body(req_body, req);
 
-                    try read_request_body(req_body, req);
-
-                    var requests = parse_json(c, rssStructs.FeedRequests, req_body) catch |err| {
-                        const response_body = try std.fmt.allocPrint(c.a, "Error {s}: {s}", .{ @errorName(err), req_body });
-                        defer c.a.free(response_body);
-                        try @constCast(req).respond(response_body, .{ .status = .bad_request, .extra_headers = &.{.{ .name = "Content-Type", .value = "text/plain" }} });
-                        return;
-                    };
-                    defer requests.deinit(c.a);
-
-                    const results = c.rss.processRequests(requests) catch |err| {
-                        const response_body = try std.fmt.allocPrint(c.a, "Error {s}", .{@errorName(err)});
-                        defer c.a.free(response_body);
-                        try @constCast(req).respond(response_body, .{ .status = .internal_server_error, .extra_headers = &.{.{ .name = "Content-Type", .value = "text/plain" }} });
-                        return;
-                    };
-                    defer utilities.deinitList(results, c.a);
-
-                    const response_body = try c.rss.toJson(results.items);
+                var requests = parse_json(c, rssStructs.FeedRequests, req_body) catch |err| {
+                    const response_body = try std.fmt.allocPrint(c.a, "Error {s}: {s}", .{ @errorName(err), req_body });
                     defer c.a.free(response_body);
-
-                    // std.debug.print("{s}\n", .{response_body});
-
-                    // Content-Type is intentionally text/plain to keep the client
-                    // side simple; the body is valid JSON regardless of the header.
-                    try @constCast(req).respond(response_body, .{ .extra_headers = &.{.{ .name = "Content-Type", .value = "text/plain" }} });
-
+                    try @constCast(req).respond(response_body, .{ .status = .bad_request, .extra_headers = &.{.{ .name = "Content-Type", .value = "text/plain" }} });
                     return;
-                }
+                };
+                defer requests.deinit(c.a);
+
+                const results = c.rss.processRequests(requests) catch |err| {
+                    const response_body = try std.fmt.allocPrint(c.a, "Error {s}", .{@errorName(err)});
+                    defer c.a.free(response_body);
+                    try @constCast(req).respond(response_body, .{ .status = .internal_server_error, .extra_headers = &.{.{ .name = "Content-Type", .value = "text/plain" }} });
+                    return;
+                };
+                defer utilities.deinitList(results, c.a);
+
+                const response_body = try c.rss.toJson(results.items);
+                defer c.a.free(response_body);
+
+                // std.debug.print("{s}\n", .{response_body});
+
+                // Content-Type is intentionally text/plain to keep the client
+                // side simple; the body is valid JSON regardless of the header.
+                try @constCast(req).respond(response_body, .{ .extra_headers = &.{.{ .name = "Content-Type", .value = "text/plain" }} });
+
+                return;
             }
         }
 
@@ -268,10 +285,5 @@ pub const Server = struct {
         if (req.head.content_length != null) {
             try req.readerExpectNone(buffer).fill(@as(usize, req.head.content_length.?));
         }
-    }
-
-    fn handle_head(c: *Context, req: *http.Server.Request) !void {
-        _ = c;
-        try @constCast(req).respond("fetch response", .{ .extra_headers = &.{.{ .name = "Content-Type", .value = "text/plain" }} });
     }
 };
