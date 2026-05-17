@@ -207,84 +207,84 @@ fn testLogger(a: std.mem.Allocator, io: std.Io) !*logger.Logger {
     return l;
 }
 
-// test "getElementContents returns text between matching tags" {
-//     const a = std.testing.allocator;
+test "getElementContents returns text between matching tags" {
+    const a = std.testing.allocator;
 
-//     const text = Client.getElementContents(a, "title", "<title>Hello</title>");
-//     defer if (text.len > 0) a.free(text);
+    const text = Client.getElementContents(a, "title", "<title>Hello</title>");
+    defer if (text != null and text.?.len > 0) a.free(text.?);
 
-//     try std.testing.expectEqualStrings("Hello", text);
-// }
+    try std.testing.expectEqualStrings("Hello", text.?);
+}
 
-// test "getElementContents returns empty string when closing tag absent" {
-//     const a = std.testing.allocator;
+test "getElementContents returns nu8ll string when closing tag absent" {
+    const a = std.testing.allocator;
 
-//     const text = Client.getElementContents(a, "title", "<title>Hello");
-//     try std.testing.expectEqualStrings("", text);
-// }
+    const text = Client.getElementContents(a, "title", "<title>Hello");
+    try std.testing.expect(text == null);
+}
 
-// test "getElementContents returns empty string for empty element" {
-//     const a = std.testing.allocator;
+test "getElementContents returns empty string for empty element" {
+    const a = std.testing.allocator;
 
-//     const text = Client.getElementContents(a, "title", "<title></title>");
-//     try std.testing.expectEqualStrings("", text);
-// }
+    const text = Client.getElementContents(a, "title", "<title></title>");
+    try std.testing.expectEqualStrings("", text.?);
+}
 
-// test "parseResponse extracts entries from minimal RSS XML" {
-//     const a = std.testing.allocator;
-//     const io = std.testing.io;
-//     const l = try testLogger(a, io);
-//     defer l.deinit();
+test "parseResponse extracts entries from minimal RSS XML" {
+    const a = std.testing.allocator;
+    const io = std.testing.io;
+    const l = try testLogger(a, io);
+    defer l.deinit();
 
-//     const req = feedRequest{ .url = try a.dupe(u8, "https://example.com/feed"), .age_limit_hours = 0, .item_limit = 5 };
-//     defer @constCast(&req).deinit(a);
+    const req = feedRequest{ .url = try a.dupe(u8, "https://example.com/feed"), .age_limit_hours = 0, .item_limit = 5 };
+    defer @constCast(&req).deinit(a);
 
-//     var result: feedResult = .init(a);
-//     defer result.deinit();
-//     result.request = req.clone(a);
-//     result.body = try a.dupe(
-//         u8,
-//         "<rss><channel><item><title>T1</title><description>D1</description><link>L1</link><pubDate>Fri, 17 Apr 2026 08:00:00 -0400</pubDate></item></channel></rss>",
-//     );
+    var result: feedResult = .init(a);
+    defer result.deinit();
+    result.request = req.clone(a);
+    result.body = try a.dupe(
+        u8,
+        "<rss><channel><item><title>T1</title><description>D1</description><link>L1</link><pubDate>Fri, 17 Apr 2026 08:00:00 -0400</pubDate></item></channel></rss>",
+    );
 
-//     var entries = try Client.parseResponse(result, a, io, l);
-//     defer deinitEntries(&entries, a);
+    var entries = try Client.parseResponse(result, a, io, l);
+    defer deinitEntries(&entries, a);
 
-//     try std.testing.expectEqual(@as(usize, 1), entries.items.len);
-//     try std.testing.expectEqualStrings("T1", entries.items[0].title);
-//     try std.testing.expectEqualStrings("D1", entries.items[0].subject);
-//     try std.testing.expectEqualStrings("L1", entries.items[0].link);
-//     try std.testing.expect(entries.items[0].parsedDate != null);
-// }
+    try std.testing.expectEqual(@as(usize, 1), entries.items.len);
+    try std.testing.expectEqualStrings("T1", entries.items[0].title.?);
+    try std.testing.expectEqualStrings("D1", entries.items[0].subject.?);
+    try std.testing.expectEqualStrings("L1", entries.items[0].link.?);
+    try std.testing.expect(entries.items[0].parsedDate != null);
+}
 
-// test "parseResponse item_limit stops reading after N entries" {
-//     const a = std.testing.allocator;
-//     const io = std.testing.io;
-//     const l = try testLogger(a, io);
-//     defer l.deinit();
+test "parseResponse item_limit stops reading after N entries" {
+    const a = std.testing.allocator;
+    const io = std.testing.io;
+    const l = try testLogger(a, io);
+    defer l.deinit();
 
-//     const req = feedRequest{ .url = try a.dupe(u8, "https://example.com/feed"), .age_limit_hours = 0, .item_limit = 2 };
-//     defer @constCast(&req).deinit(a);
+    const req = feedRequest{ .url = try a.dupe(u8, "https://example.com/feed"), .age_limit_hours = 0, .item_limit = 2 };
+    defer @constCast(&req).deinit(a);
 
-//     var result: feedResult = .init(a);
-//     defer result.deinit();
-//     result.request = req.clone(a);
-//     result.body = try a.dupe(
-//         u8,
-//         "<rss><channel>" ++
-//             "<item><title>A</title><description>A</description><link>A</link><pubDate>Fri, 17 Apr 2026 08:00:00 -0400</pubDate></item>" ++
-//             "<item><title>B</title><description>B</description><link>B</link><pubDate>Fri, 17 Apr 2026 09:00:00 -0400</pubDate></item>" ++
-//             "<item><title>C</title><description>C</description><link>C</link><pubDate>Fri, 17 Apr 2026 10:00:00 -0400</pubDate></item>" ++
-//             "</channel></rss>",
-//     );
+    var result: feedResult = .init(a);
+    defer result.deinit();
+    result.request = req.clone(a);
+    result.body = try a.dupe(
+        u8,
+        "<rss><channel>" ++
+            "<item><title>A</title><description>A</description><link>A</link><pubDate>Fri, 17 Apr 2026 08:00:00 -0400</pubDate></item>" ++
+            "<item><title>B</title><description>B</description><link>B</link><pubDate>Fri, 17 Apr 2026 09:00:00 -0400</pubDate></item>" ++
+            "<item><title>C</title><description>C</description><link>C</link><pubDate>Fri, 17 Apr 2026 10:00:00 -0400</pubDate></item>" ++
+            "</channel></rss>",
+    );
 
-//     var entries = try Client.parseResponse(result, a, io, l);
-//     defer deinitEntries(&entries, a);
+    var entries = try Client.parseResponse(result, a, io, l);
+    defer deinitEntries(&entries, a);
 
-//     try std.testing.expectEqual(@as(usize, 2), entries.items.len);
-//     try std.testing.expectEqualStrings("A", entries.items[0].title);
-//     try std.testing.expectEqualStrings("B", entries.items[1].title);
-// }
+    try std.testing.expectEqual(@as(usize, 2), entries.items.len);
+    try std.testing.expectEqualStrings("A", entries.items[0].title.?);
+    try std.testing.expectEqualStrings("B", entries.items[1].title.?);
+}
 
 test "parseResponse age_limit_hours 0 disables age filter" {
     const a = std.testing.allocator;
