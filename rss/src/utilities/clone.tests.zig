@@ -674,6 +674,33 @@ test "isMyArrayList matches aligned array list types" {
     }));
 }
 
+const deinitableEntry = struct {
+    value: []const u8,
+
+    pub fn init(a: std.mem.Allocator, value: []const u8) @This() {
+        return .{ .value = a.dupe(u8, value) catch unreachable };
+    }
+
+    pub fn deinit(s: @This(), a: std.mem.Allocator) void {
+        a.free(s.value);
+    }
+};
+
+test "isArrayList and deinitList accept pointer array list of deinitable structs" {
+    const a = std.testing.allocator;
+    const List = std.ArrayList(deinitableEntry);
+
+    var entries: List = .empty;
+    try entries.append(a, deinitableEntry.init(a, "one"));
+
+    const entries_ptr = &entries;
+
+    try std.testing.expect(isArrayList(List));
+    try std.testing.expect(isArrayList(@TypeOf(entries_ptr)));
+
+    deinitList(entries_ptr, a);
+}
+
 test "clone struct" {
     const a = std.testing.allocator;
     const first = testStruct{ .integer = 384, .float = 23.42, .slice = try a.dupe(u8, "what"), .inner = .{ .innerSlice = try a.dupe(u8, "what") } };

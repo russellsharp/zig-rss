@@ -95,10 +95,10 @@ pub const FeedRequest = struct {
 
 pub const FeedEntry = struct {
     const Self = @This();
-    link: string = undefined,
-    subject: string = undefined,
-    published: string = undefined,
-    title: string = undefined,
+    link: ?string = undefined,
+    subject: ?string = undefined,
+    published: ?string = undefined,
+    title: ?string = undefined,
     parsedDate: ?string = null,
 
     pub fn init(a: std.mem.Allocator, link: string, subject: string, published: string, title: string, parsedDate: string) Self {
@@ -112,21 +112,29 @@ pub const FeedEntry = struct {
         return s.*;
     }
 
-    pub fn deinit(s: Self, a: std.mem.Allocator) void {
-        a.free(s.link);
-        a.free(s.subject);
-        a.free(s.published);
-        a.free(s.title);
-        a.free(s.parsedDate.?);
+    fn free_optional(field: *const ?[]const u8, a: std.mem.Allocator) void {
+        var ptr: *?[]const u8 = @constCast(field);
+        _ = &ptr;
+        if (ptr.*) |field_notnull| {
+            a.free(field_notnull);
+        }
+        ptr.* = null;
+    }
+    pub fn deinit(s: *Self, a: std.mem.Allocator) void {
+        free_optional(&s.link, a);
+        free_optional(&s.subject, a);
+        free_optional(&s.published, a);
+        free_optional(&s.title, a);
+        free_optional(&s.parsedDate, a);
     }
 
     pub fn clone(s: *const Self, a: std.mem.Allocator) !Self {
         var copy = s.*;
-        copy.link = try a.dupe(u8, s.link);
-        copy.subject = try a.dupe(u8, s.subject);
-        copy.published = try a.dupe(u8, s.published);
-        copy.title = try a.dupe(u8, s.title);
-        copy.parsedDate = try a.dupe(u8, s.parsedDate.?);
+        copy.link = try a.dupe(u8, s.link orelse "");
+        copy.subject = try a.dupe(u8, s.subject orelse "");
+        copy.published = try a.dupe(u8, s.published orelse "");
+        copy.title = try a.dupe(u8, s.title orelse "");
+        copy.parsedDate = try a.dupe(u8, s.parsedDate orelse "");
         return copy;
     }
 
@@ -186,6 +194,7 @@ pub const FeedResult = struct {
         if (s.url) |url| a.free(url);
         s.request.deinit(a);
         deinitList(s.entries, a);
+
         if (s.body) |body| a.free(body);
         if (s.headers) |headers| {
             for (headers.items) |header| {

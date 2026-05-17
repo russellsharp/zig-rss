@@ -32,7 +32,7 @@ test "Summary.fromFeedResult clones owned data" {
 
     try std.testing.expect(summary.title.ptr != result.url.?.ptr);
     try std.testing.expectEqualStrings(result.url.?, summary.title);
-    try std.testing.expectEqualStrings(result.entries.items[0].title, summary.entries.items[0].title);
+    try std.testing.expectEqualStrings(result.entries.items[0].title.?, summary.entries.items[0].title.?);
     try std.testing.expectEqualStrings(result.errors.items[0], summary.errors.items[0]);
 }
 

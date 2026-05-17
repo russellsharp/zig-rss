@@ -54,3 +54,23 @@ test "parsing parameters" {
     try std.testing.expectEqualSlices(u8, "2", two);
     try std.testing.expectEqualSlices(u8, "three", three);
 }
+
+test "get_query_parameters no query string returns no params" {
+    const a = std.testing.allocator;
+    var paramMap = std.StringHashMap([]u8).init(a);
+    defer paramMap.deinit();
+
+    try get_query_parameters("/hello/path", &paramMap);
+
+    try std.testing.expectEqual(@as(usize, 0), paramMap.count());
+}
+
+test "get_query_parameters single parameter parses correctly" {
+    const a = std.testing.allocator;
+    var paramMap = std.StringHashMap([]u8).init(a);
+    defer paramMap.deinit();
+
+    try get_query_parameters("/hello/?key=val", &paramMap);
+
+    try std.testing.expectEqualStrings("val", paramMap.get("key").?);
+}

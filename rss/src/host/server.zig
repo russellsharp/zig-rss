@@ -287,3 +287,27 @@ pub const Server = struct {
         }
     }
 };
+
+test "RouteHandler.isSupported returns true for registered route" {
+    const a = std.testing.allocator;
+    var routes = RouteHandler.init(a, &[_][]const u8{"/rss"});
+    defer routes.deinit(a);
+
+    try std.testing.expect(routes.isSupported("/rss"));
+}
+
+test "RouteHandler.isSupported returns false for unregistered route" {
+    const a = std.testing.allocator;
+    var routes = RouteHandler.init(a, &[_][]const u8{"/rss"});
+    defer routes.deinit(a);
+
+    try std.testing.expect(!routes.isSupported("/other"));
+}
+
+test "RouteHandler.isSupported is case-insensitive" {
+    const a = std.testing.allocator;
+    var routes = RouteHandler.init(a, &[_][]const u8{"/rss"});
+    defer routes.deinit(a);
+
+    try std.testing.expect(routes.isSupported("/RSS"));
+}

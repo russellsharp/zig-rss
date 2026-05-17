@@ -7,9 +7,8 @@ const example = "Fri, 17 Apr 2026 08:00:00 -0400";
 const example_single_digit_day = "Fri, 7 Apr 2026 08:00:00 -0400";
 
 test "difference in unix times in hours" {
-    const tio = std.testing.io;
-    const dt_1 = try time_mod.parseDateTime("Fri, 17 Apr 2026 08:00:00 -0400", tio);
-    const dt_2 = try time_mod.parseDateTime("Fri, 17 Apr 2026 03:00:00 -0400", tio);
+    const dt_1 = try time_mod.parseDateTime("Fri, 17 Apr 2026 08:00:00 -0400");
+    const dt_2 = try time_mod.parseDateTime("Fri, 17 Apr 2026 03:00:00 -0400");
     const unix_1: i64 = @intCast(time_mod.dateTimeToUnixUtc(dt_1));
     const unix_2: i64 = @intCast(time_mod.dateTimeToUnixUtc(dt_2));
     const diff = time_mod.differenceHours(unix_1, unix_2);
@@ -17,8 +16,7 @@ test "difference in unix times in hours" {
 }
 
 test "date time to unix" {
-    const tio = std.testing.io;
-    const dt = try time_mod.parseDateTime(example, tio);
+    const dt = try time_mod.parseDateTime(example);
     try std.testing.expectEqual(17, dt.day);
     try std.testing.expectEqual(4, dt.month);
     try std.testing.expectEqual(2026, dt.year);
@@ -98,9 +96,8 @@ test "differenceHours" {
 }
 
 test "parseDateTime two-digit day" {
-    const tio = std.testing.io;
     const input = "Wed, 10 Dec 2025 23:06:28 +0000";
-    const dt = try time_mod.parseDateTime(input, tio);
+    const dt = try time_mod.parseDateTime(input);
     try std.testing.expectEqual(@as(u32, 2025), dt.year);
     try std.testing.expectEqual(@as(u8, 12), dt.month);
     try std.testing.expectEqual(@as(u8, 10), dt.day);
@@ -111,24 +108,21 @@ test "parseDateTime two-digit day" {
 }
 
 test "single digit day" {
-    const tio = std.testing.io;
-    const dt = try time_mod.parseDateTime(example_single_digit_day, tio);
+    const dt = try time_mod.parseDateTime(example_single_digit_day);
     try std.testing.expectEqual(7, dt.day);
     try std.testing.expectEqual(4, dt.month);
 }
 
 test "dateTime by function" {
-    const tio = std.testing.io;
-    const dt = try time_mod.parseDateTime(example, tio);
+    const dt = try time_mod.parseDateTime(example);
     try std.testing.expectEqual(17, dt.day);
     try std.testing.expectEqual(4, dt.month);
     try std.testing.expectEqual(2026, dt.year);
 }
 
 test "apply timezone new year rollover" {
-    const tio = std.testing.io;
     const new_years_eve = "Fri, 31 DEC 2026 23:59:00 -0000";
-    const dt_0 = try time_mod.parseDateTime(new_years_eve, tio);
+    const dt_0 = try time_mod.parseDateTime(new_years_eve);
     try std.testing.expectEqual(23, dt_0.hour);
     const dt_offset = try time_mod.applyOffset(dt_0, 4);
     try std.testing.expectEqual(3, dt_offset.hour);
@@ -137,9 +131,8 @@ test "apply timezone new year rollover" {
 }
 
 test "apply timezone new years day rollback" {
-    const tio = std.testing.io;
     const new_years_day = "Fri, 01 JAN 2026 00:00:00 -0100";
-    const dt_1 = try time_mod.parseDateTime(new_years_day, tio);
+    const dt_1 = try time_mod.parseDateTime(new_years_day);
     const dt_offset = try time_mod.applyOffset(dt_1, -1);
     try std.testing.expectEqual(2025, dt_offset.year);
     try std.testing.expectEqual(12, dt_offset.month);

@@ -3,8 +3,11 @@ const parseTime = @This();
 const time = @import("std").time;
 const string = []const u8;
 
-pub fn parseDateTime(date_time: string, io: std.Io) !DateTime {
-    var dt = DateTime.now(io);
+pub fn parseDateTime(input: ?string) !DateTime {
+    var dt = DateTime.alpha;
+    if (input == null) return dt;
+
+    var date_time = input.?;
 
     const dayofTheMonthNumeralString = date_time[5..7];
     var day_offset: usize = 0;
@@ -78,6 +81,8 @@ pub const DateTime = struct {
     second: u8,
     millisecond: u16,
     timezone: i16,
+
+    const alpha = DateTime{ .year = 1970, .month = 1, .day = 1, .hour = 0, .minute = 0, .second = 0, .millisecond = 0, .timezone = 0 };
 
     pub fn now(io: std.Io) DateTime {
         const timestamp_now = std.Io.Timestamp.now(io, .real).toMilliseconds();

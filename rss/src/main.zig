@@ -75,3 +75,58 @@ const config = struct {
     port: u16 = 8089,
     loggingEnabled: bool = true,
 };
+
+fn makeArgsFromCmdLine(a: std.mem.Allocator, cmd_line: []const u8) !struct { args: std.process.Args, raw: []u16 } {
+    const cmd_line_w = try std.unicode.wtf8ToWtf16LeAlloc(a, cmd_line);
+    return .{
+        .args = .{ .vector = cmd_line_w },
+        .raw = cmd_line_w,
+    };
+}
+
+test "readArgs defaults when no args provided" {
+    const a = std.testing.allocator;
+
+    const input = try makeArgsFromCmdLine(a, "rss.exe");
+    defer a.free(input.raw);
+
+    const parsed = try readArgs(a, input.args);
+
+    try std.testing.expectEqual(@as(u16, 8089), parsed.port);
+    try std.testing.expectEqual(true, parsed.loggingEnabled);
+    try std.testing.expectEqualStrings("127.0.0.1", parsed.host);
+}
+
+test "readArgs parses port and address" {
+    const a = std.testing.allocator;
+
+    const input = try makeArgsFromCmdLine(a, "rss.exe port=9090 address=0.0.0.0");
+    defer a.free(input.raw);
+
+    const parsed = try readArgs(a, input.args);
+
+    try std.testing.expectEqual(@as(u16, 9090), parsed.port);
+    try std.testing.expectEqualStrings("0.0.0.0", parsed.host);
+}
+
+test "readArgs logEnabled flag without value enables logging" {
+    const a = std.testing.allocator;
+
+    const input = try makeArgsFromCmdLine(a, "rss.exe logEnabled");
+    defer a.free(input.raw);
+
+    const parsed = try readArgs(a, input.args);
+
+    try std.testing.expectEqual(true, parsed.loggingEnabled);
+}
+
+test "readArgs logEnabled=false disables logging" {
+    const a = std.testing.allocator;
+
+    const input = try makeArgsFromCmdLine(a, "rss.exe logEnabled=false");
+    defer a.free(input.raw);
+
+    const parsed = try readArgs(a, input.args);
+
+    try std.testing.expectEqual(false, parsed.loggingEnabled);
+}

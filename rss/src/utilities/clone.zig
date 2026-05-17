@@ -44,21 +44,26 @@ pub fn cloneStruct(a: std.mem.Allocator, T: type, s: T) !T {
 }
 
 pub inline fn isArrayList(T: type) bool {
-    if (@typeInfo(T) != .@"struct") return false;
-    if (!@hasDecl(T, "Slice") or !@hasField(T, "items") or !@hasField(T, "capacity")) return false;
+    const input_type = switch (@typeInfo(T)) {
+        .pointer => |ptr| ptr.child,
+        else => T,
+    };
 
-    const Slice = T.Slice;
+    if (@typeInfo(input_type) != .@"struct") return false;
+    if (!@hasDecl(input_type, "Slice") or !@hasField(input_type, "items") or !@hasField(input_type, "capacity")) return false;
+
+    const Slice = input_type.Slice;
     const slice_info = switch (@typeInfo(Slice)) {
         .pointer => |info| info,
         else => return false,
     };
 
     if (slice_info.size != .slice) return false;
-    if (@TypeOf(@field(@as(T, undefined), "items")) != Slice) return false;
+    if (@TypeOf(@field(@as(input_type, undefined), "items")) != Slice) return false;
 
     // Match std array list instantiations (including managed variants) without
     // depending on a single concrete type alias.
-    return std.mem.indexOf(u8, @typeName(T), "array_list") != null;
+    return std.mem.indexOf(u8, @typeName(input_type), "array_list") != null;
 }
 
 fn cloneElement(a: std.mem.Allocator, T: type, item: T) !T {
@@ -114,9 +119,14 @@ fn cloneElement(a: std.mem.Allocator, T: type, item: T) !T {
 }
 
 pub fn deinitList(list: anytype, a: std.mem.Allocator) void {
-    const list_type = @TypeOf(list);
+    const input_type = @TypeOf(list);
+    const list_type = switch (@typeInfo(input_type)) {
+        .pointer => |ptr| ptr.child,
+        else => input_type,
+    };
+
     if (comptime !isArrayList(list_type)) {
-        std.debug.print("Cannot use deinitArrayList to deinit other types.\n", .{});
+        std.debug.print("Cannot use deinitArrayList to deinit other types.  Type: {s}\n", .{@typeName(list_type)});
         unreachable;
     }
 
@@ -129,7 +139,14 @@ pub fn deinitList(list: anytype, a: std.mem.Allocator) void {
             a.free(item);
         }
     }
-    deinitStruct(list, a);
+
+    switch (@typeInfo(input_type)) {
+        .pointer => {
+            var list_ptr = @constCast(list);
+            list_ptr.deinit(a);
+        },
+        else => deinitStruct(list, a),
+    }
 }
 
 pub fn deinitStruct(item: anytype, a: std.mem.Allocator) void {
