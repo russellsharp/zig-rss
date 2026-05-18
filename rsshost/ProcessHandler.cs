@@ -36,6 +36,24 @@ public sealed class ProcessHandlerOptions
         init;
     } = 1000;
 
+    public string Address
+    {
+        get;
+        init;
+    } = "127.0.0.1";
+
+    public int Port
+    {
+        get;
+        init;
+    } = 8089;
+
+    public bool EnableLogging
+    {
+        get;
+        init;    
+    } = true;
+
     public override string ToString()
     {
         return $"ProcessHandlerOptions: '{ProcessName}' '{Executable}' '{WaitMs}'";
@@ -84,12 +102,13 @@ public class ProcessHandler : IProcessHandler
             {
                 FileName = _config.Executable,
                 CreateNoWindow = true, // Run in the background
+                Arguments = $"enableLogging={_config.EnableLogging} host={_config.Address} port={_config.Port}",
             };
 
             using (var process = Process.Start(startInfo))
             {
                 ArgumentNullException.ThrowIfNull(process);
-                _logger.LogInformation($"Creatred process with Id: {process.Id}, {process.ProcessName}");
+                _logger.LogInformation($"Creatred process with Id: {process.Id}, {process.ProcessName}, Arguments: {startInfo.Arguments}");
                 await process.WaitForExitAsync(token);
                 _logger.LogInformation($"Process Id: {process.Id} has exited or service is exiting.");
             }

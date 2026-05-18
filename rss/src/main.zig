@@ -42,6 +42,15 @@ pub fn main(init: std.process.Init) !void {
 
 fn readArgs(a: std.mem.Allocator, args: std.process.Args) !config {
     var argsMap = std.StringHashMap([]const u8).init(a);
+    defer argsMap.deinit();
+    defer {
+        var iter = argsMap.iterator();
+        while (iter.next()) |item| {
+            a.free(item.key_ptr.*);
+            a.free(item.value_ptr.*);
+        }
+    }
+
     var arg_iter = try std.process.Args.iterateAllocator(args, a);
     defer arg_iter.deinit();
 
@@ -50,17 +59,22 @@ fn readArgs(a: std.mem.Allocator, args: std.process.Args) !config {
             var parts = std.mem.splitScalar(u8, nv, '=');
             const name = if (parts.next()) |part| part else null;
             const value = if (parts.next()) |part| part else null;
+            //if we find a value-key pair, store it with a lowercase key
             if (name != null and value != null)
-                try argsMap.put(name.?, value.?);
+                try argsMap.put(toLower(a, name.?), toLower(a, value.?));
         } else {
-            try argsMap.put(nv, "");
+            //if we find a single value, store the key with a blank value
+            try argsMap.put(toLower(a, nv), "");
         }
     }
-    const log_key = "logEnabled";
-    const port = try std.fmt.parseInt(u16, argsMap.get("port") orelse "8089", 10);
-    const local = argsMap.get("address") orelse "127.0.0.1";
+
+    const log_key = "logenabled";
+    const port_key = "port";
+    const address_key = "address";
+    const port = try std.fmt.parseInt(u16, argsMap.get(port_key) orelse "8089", 10);
+    const local = argsMap.get(address_key) orelse "127.0.0.1";
     // "logEnabled" with no explicit value is treated as enabled for CLI
-    // convenience (e.g. passing only `logEnabled`).
+    // convenience (e.g. passing only `logenabled`).
     const enable_logging = std.ascii.eqlIgnoreCase(argsMap.get(log_key) orelse "true", "true") or std.ascii.eqlIgnoreCase(argsMap.get(log_key) orelse "", "");
 
     return config{
@@ -75,6 +89,14 @@ const config = struct {
     port: u16 = 8089,
     loggingEnabled: bool = true,
 };
+
+fn toLower(a: std.mem.Allocator, text: []const u8) []const u8 {
+    var copy = a.dupe(u8, text) catch unreachable;
+    for (copy, 0..) |c, i| {
+        copy[i] = std.ascii.toLower(c);
+    }
+    return copy;
+}
 
 fn makeArgsFromCmdLine(a: std.mem.Allocator, cmd_line: []const u8) !struct { args: std.process.Args, raw: []u16 } {
     const cmd_line_w = try std.unicode.wtf8ToWtf16LeAlloc(a, cmd_line);
