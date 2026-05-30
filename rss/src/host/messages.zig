@@ -28,7 +28,9 @@ pub const ContentType = enum {
     pub fn from_string(text: []const u8) !ContentType {
         // Some HTTP stacks include CRLF and other white space after header values; compare only the
         // first line so "application/json\r\n" still resolves correctly.
-        const relevant_text = text[0 .. std.mem.indexOf(u8, text, "\r") orelse text.len];
+        const white_space = "\r; \t";
+        const trimmed_text = std.mem.trim(u8, text, white_space);
+        const relevant_text = trimmed_text[0..std.mem.indexOf(u8, trimmed_text, ";") orelse trimmed_text.len);
         if (std.mem.eql(u8, relevant_text, to_string(&ContentType.PlainText))) return ContentType.PlainText;
         if (std.mem.eql(u8, relevant_text, to_string(&ContentType.Json))) return ContentType.Json;
         return ContentType.Unknown;

@@ -72,7 +72,7 @@ fn readArgs(a: std.mem.Allocator, args: std.process.Args) !config {
     const port_key = "port";
     const address_key = "address";
     const port = try std.fmt.parseInt(u16, argsMap.get(port_key) orelse "8089", 10);
-    const local = argsMap.get(address_key) orelse "127.0.0.1";
+    const local = try a.dupe(u8, argsMap.get(address_key) orelse "127.0.0.1");
     // "logEnabled" with no explicit value is treated as enabled for CLI
     // convenience (e.g. passing only `logenabled`).
     const enable_logging = std.ascii.eqlIgnoreCase(argsMap.get(log_key) orelse "true", "true") or std.ascii.eqlIgnoreCase(argsMap.get(log_key) orelse "", "");

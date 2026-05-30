@@ -85,6 +85,7 @@ async function refresh() {
     const result = await window.rssWidget.refreshFeeds();
     renderEntries(result.entries);
     setStatus(`Loaded ${result.entries.length} entr${result.entries.length === 1 ? "y" : "ies"}.`, "ok");
+    if (result.entries.length === 0) scheduleFailedRefreshRetry();
   } catch (err) {
     clearList();
     showEmpty("Unable to load entries.");
@@ -104,10 +105,12 @@ async function refresh() {
 async function init() {
   try {
     const cfg = await window.rssWidget.loadConfig();
-    serviceInfo.textContent = `${cfg.serviceUrl}  ·  ${cfg.requestCount} feed${cfg.requestCount === 1 ? "" : "s"}`;
+    const intervalMinutes = Number.isFinite(cfg.refreshIntervalMinutes) ? Math.max(1, Math.floor(cfg.refreshIntervalMinutes)) : 30;
+    serviceInfo.textContent = `${cfg.serviceUrl}  ·  ${cfg.requestCount} feed${cfg.requestCount === 1 ? "" : "s"}  ·  auto-refresh ${intervalMinutes}m`;
     failedRefreshIntervalMinutes = Number.isFinite(cfg.refreshIntervalFailedMinutes)
       ? Math.max(1, Math.floor(cfg.refreshIntervalFailedMinutes))
       : DEFAULT_FAILED_REFRESH_INTERVAL_MINUTES;
+    setInterval(refresh, intervalMinutes * 60 * 1000);
   } catch (err) {
     serviceInfo.textContent = "Config error";
     setStatus(err.message, "danger");

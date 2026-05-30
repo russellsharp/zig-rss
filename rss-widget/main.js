@@ -36,6 +36,9 @@ async function loadConfig(configPath) {
   if (!parsed || typeof parsed !== "object") throw new Error("Config must be a JSON object.");
   if (typeof parsed.serviceUrl !== "string" || !parsed.serviceUrl) throw new Error("Config must include a non-empty serviceUrl.");
   if (!Array.isArray(parsed.requests)) throw new Error("Config must include requests as an array.");
+  parsed.refreshIntervalMinutes = Number.isFinite(parsed.refreshIntervalMinutes)
+    ? Math.max(1, Math.floor(parsed.refreshIntervalMinutes))
+    : 30;
   parsed.refreshIntervalFailedMinutes = Number.isFinite(parsed.refreshIntervalFailedMinutes)
     ? Math.max(1, Math.floor(parsed.refreshIntervalFailedMinutes))
     : DEFAULT_FAILED_REFRESH_INTERVAL_MINUTES;
@@ -170,6 +173,7 @@ ipcMain.handle("feeds:load-config", async (_e, configPath) => {
     configPath: configPath || defaultConfigPath,
     serviceUrl: cfg.serviceUrl,
     requestCount: cfg.requests.length,
+    refreshIntervalMinutes: cfg.refreshIntervalMinutes,
     refreshIntervalFailedMinutes: cfg.refreshIntervalFailedMinutes,
   };
 });
