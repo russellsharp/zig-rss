@@ -120,13 +120,13 @@ pub const Client = struct {
                         entry = .init(a, "", "", "", "", "");
                         errdefer entry.deinit(a);
                     } else if (std.ascii.eqlIgnoreCase("title", elementName) and itemOpened) {
-                        entry.title = getElementContents(a, "title", reader.buf);
+                        entry.title = try reader.readElementTextAlloc(a);
                         continue;
                     } else if (std.ascii.eqlIgnoreCase("description", elementName) and itemOpened) {
-                        entry.subject = getElementContents(a, "description", reader.buf);
+                        entry.subject = try reader.readElementTextAlloc(a);
                         continue;
                     } else if (std.ascii.eqlIgnoreCase("link", elementName) and itemOpened) {
-                        entry.link = getElementContents(a, "link", reader.buf);
+                        entry.link = try reader.readElementTextAlloc(a);
                         continue;
                     } else if (itemOpened and std.ascii.eqlIgnoreCase("enclosure", elementName)) {
                         if (reader.attributes.get("url")) |attribute_index| {
@@ -134,8 +134,8 @@ pub const Client = struct {
                         }
                         continue;
                     } else if (std.ascii.eqlIgnoreCase("pubDate", elementName) and itemOpened) {
-                        entry.published = getElementContents(a, "pubDate", reader.buf);
-
+                        // entry.published = getElementContents(a, "pubDate", reader.buf);
+                        entry.published = try reader.readElementTextAlloc(a);
                         const dt = time.parseDateTime(entry.published.?) catch |err| {
                             try l.format(.Error, "ERROR: {s} -> {any}\n", .{ entry.published.?, err }, @typeName(@This()));
                             return err;
