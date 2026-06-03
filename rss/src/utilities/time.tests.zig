@@ -140,6 +140,18 @@ test "apply timezone new years day rollback" {
     try std.testing.expectEqual(23, dt_offset.hour);
 }
 
+test "Diary of a CEO timestamp" {
+    const timestamp = "Mon, 01 Jun 2026 05:00:00 -0000";
+    const dt = try time_mod.parseDateTime(timestamp);
+    try std.testing.expectEqual(2026, dt.year);
+    try std.testing.expectEqual(1, dt.day);
+    try std.testing.expectEqual(6, dt.month);
+    try std.testing.expectEqual(5, dt.hour);
+    try std.testing.expectEqual(0, dt.minute);
+    try std.testing.expectEqual(0, dt.second);
+    try std.testing.expectEqual(0, dt.timezone);
+}
+
 test "unix to string" {
     const allocator = std.heap.page_allocator;
 

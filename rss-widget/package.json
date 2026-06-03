@@ -5,13 +5,13 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "predist": "node scripts/prepare-dist.js",
     "dist": "electron-builder"
   },
   "devDependencies": {
     "electron": "^31.7.7",
     "electron-builder": "^26.8.1"
-  }
-  ,
+  },
   "build": {
     "appId": "com.example.rsswidget",
     "productName": "RSS Widget",
@@ -21,10 +21,13 @@
       "!node_modules/.cache/"
     ],
     "directories": {
-      "buildResources": "build"
+      "buildResources": "build",
+      "output": "release"
     },
     "win": {
-      "target": ["portable"],
+      "target": [
+        "portable"
+      ],
       "icon": "icon.ico"
     },
     "portable": {

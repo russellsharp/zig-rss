@@ -128,6 +128,11 @@ pub const Client = struct {
                     } else if (std.ascii.eqlIgnoreCase("link", elementName) and itemOpened) {
                         entry.link = getElementContents(a, "link", reader.buf);
                         continue;
+                    } else if (itemOpened and std.ascii.eqlIgnoreCase("enclosure", elementName)) {
+                        if (reader.attributes.get("url")) |attribute_index| {
+                            entry.link = try a.dupe(u8, try reader.attributeValue(attribute_index));
+                        }
+                        continue;
                     } else if (std.ascii.eqlIgnoreCase("pubDate", elementName) and itemOpened) {
                         entry.published = getElementContents(a, "pubDate", reader.buf);
 

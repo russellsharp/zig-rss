@@ -2,9 +2,23 @@ const { app, BrowserWindow, ipcMain, shell, screen } = require("electron");
 const fs = require("fs/promises");
 const path = require("path");
 
-const defaultConfigPath = path.join(__dirname, "config", "feeds.json");
+const bundledConfigPath = path.join(__dirname, "config", "feeds.json");
+const siblingConfigPath = path.join(path.dirname(process.execPath), "feeds.json");
 const DEFAULT_FAILED_REFRESH_INTERVAL_MINUTES = 5;
 const DEFAULT_REQUEST_TIMEOUT_SECONDS = 30;
+
+async function resolveConfigPath(configPath) {
+  if (configPath) return configPath;
+
+  try {
+    await fs.access(siblingConfigPath);
+    console.log(`[feeds] Using sibling config file: ${siblingConfigPath}`);
+    return siblingConfigPath;
+  } catch {
+    console.debug(`[feeds] Sibling config not found, falling back to bundled config: ${bundledConfigPath}`);
+    return bundledConfigPath;
+  }
+}
 
 function cleanText(value) {
   if (typeof value !== "string") return "";
@@ -31,7 +45,18 @@ function toDisplaySubject(entry) {
 }
 
 async function loadConfig(configPath) {
-  const json = await fs.readFile(configPath || defaultConfigPath, "utf8");
+  const resolvedConfigPath = await resolveConfigPath(configPath);
+  console.log(`[feeds] Loading config from: ${resolvedConfigPath}`);
+  console.debug(`[feeds] Looking for feeds.json at: ${resolvedConfigPath}`);
+
+  let json;
+  try {
+    json = await fs.readFile(resolvedConfigPath, "utf8");
+  } catch (err) {
+    console.error(`[feeds] Failed to read config at: ${resolvedConfigPath}`, err);
+    throw err;
+  }
+
   const parsed = JSON.parse(json);
   if (!parsed || typeof parsed !== "object") throw new Error("Config must be a JSON object.");
   if (typeof parsed.serviceUrl !== "string" || !parsed.serviceUrl) throw new Error("Config must include a non-empty serviceUrl.");
@@ -67,15 +92,15 @@ function extractCdata(text) {
 function stripHtml(text) {
   return text
     .replace(/<[^>]*>/g, "")          // remove tags
-    .replace(/&lt;/g,   "<")
-    .replace(/&gt;/g,   ">")
-    .replace(/&amp;/g,  "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
     .replace(/&quot;/g, '"')
     .replace(/&#8217;/g, "\u2019")
     .replace(/&#8220;/g, "\u201C")
     .replace(/&#8221;/g, "\u201D")
     .replace(/&#8230;/g, "\u2026")
-    .replace(/&#\d+;/g,  (m) => String.fromCharCode(parseInt(m.slice(2), 10)))
+    .replace(/&#\d+;/g, (m) => String.fromCharCode(parseInt(m.slice(2), 10)))
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -87,8 +112,8 @@ function flattenEntries(summaries) {
     for (const entry of entries) {
       flattened.push({
         feedTitle: cleanText(summary.title) || "Feed",
-        subject:   stripHtml(toDisplaySubject(entry)),
-        link:      cleanText(entry.link),
+        subject: stripHtml(toDisplaySubject(entry)),
+        link: cleanText(entry.link),
         published: cleanText(entry.published),
       });
     }
@@ -165,12 +190,13 @@ function createWindow() {
   win.loadFile(path.join(__dirname, "renderer", "index.html"));
 }
 
-ipcMain.handle("feeds:refresh", async (_e, configPath) => fetchFeeds(configPath || defaultConfigPath));
+ipcMain.handle("feeds:refresh", async (_e, configPath) => fetchFeeds(configPath));
 
 ipcMain.handle("feeds:load-config", async (_e, configPath) => {
-  const cfg = await loadConfig(configPath || defaultConfigPath);
+  const resolvedConfigPath = await resolveConfigPath(configPath);
+  const cfg = await loadConfig(resolvedConfigPath);
   return {
-    configPath: configPath || defaultConfigPath,
+    configPath: resolvedConfigPath,
     serviceUrl: cfg.serviceUrl,
     requestCount: cfg.requests.length,
     refreshIntervalMinutes: cfg.refreshIntervalMinutes,

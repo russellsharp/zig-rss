@@ -3,6 +3,8 @@
 zig-out/
 rss-widget/node_modules/
 rss-widget/dist/
+rss-widget/release/
+rss-widget/debug/
 rsshost/publish/
 obj/
 bin/
