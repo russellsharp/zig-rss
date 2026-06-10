@@ -1,3 +1,8 @@
+##  Pretext
+- Rss Service - Zig local web service completely written by me and reviewed by a variety of AI agents.
+- RSS Host - C# Windows service started from template and written by me.
+- RSS Widget - Electron application written completely by AI.
+
 # RSS Aggregator Monorepo
 
 This repository contains a local RSS aggregation stack with three main parts:
