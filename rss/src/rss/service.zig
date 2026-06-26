@@ -95,7 +95,7 @@ pub const rss = struct {
 
         const result = cl.pull(request) catch |err| errorCapture: {
             var erredFeed: feedResult = .init(s.a);
-            erredFeed.request = request.clone();
+            erredFeed.request = request.clone(s.a);
             s.log(.Warning, "ERRORED {s}: error while pulling feed.\n", .{@errorName(err)});
             const error_message = std.fmt.allocPrint(s.a, "{s} error while pulling feed.  Bad URL", .{@errorName(err)}) catch unreachable;
             defer s.a.free(error_message);

@@ -69,10 +69,10 @@ pub const Client = struct {
         var res: feedResult = .init(s.a);
         res.body = string.init(s.a, body.written());
         res.status = response.status;
-        res.url = request.url.clone();
+        res.url = request.url.clone(s.a);
         res.headers = .empty;
         res.errors = .empty;
-        res.request = request.clone();
+        res.request = request.clone(s.a);
 
         const entries = parseResponse(res, s.a, s.io, s.logger) catch |err| blk: {
             std.debug.print("Error while parsing response: {any}\n", .{@errorName(err)});
@@ -80,7 +80,7 @@ pub const Client = struct {
         };
 
         for (entries.items) |item| {
-            try res.entries.append(s.a, try item.clone());
+            try res.entries.append(s.a, try item.clone(s.a));
         }
         return res;
     }
@@ -145,14 +145,6 @@ pub const Client = struct {
 
                         const tz_sign: u8 = if (dt.timezone >= 0) '+' else '-';
                         const tz_value = @abs(dt.timezone);
-
-                        // const iso8601 = try std.fmt.allocPrint(
-                        //     a,
-                        //     "{}-{:0>2}-{:0>2}T{:0>2}:{:0>2}:{:0>2}.{:0>3}{c}{:0>4}",
-                        //     .{ dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, dt.millisecond, tz_sign, tz_value },
-                        // );
-                        // defer a.free(iso8601);
-
                         const format = "{}-{:0>2}-{:0>2}T{:0>2}:{:0>2}:{:0>2}.{:0>3}{c}{:0>4}";
                         const args = .{ dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, dt.millisecond, tz_sign, tz_value };
                         _ = entry.parsedDate.?.assign_format(format, args);

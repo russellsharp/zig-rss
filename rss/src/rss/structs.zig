@@ -33,9 +33,9 @@ pub const Summary = struct {
         var s = a.create(Summary) catch unreachable;
         // Prefer the resolved response URL when available (after redirects);
         // otherwise preserve the original request URL for traceability.
-        s.title = if (!result.url.?.empty()) result.url.?.clone() else result.request.url.clone();
+        s.title = if (!result.url.?.empty()) result.url.?.clone(a) else result.request.url.clone(a);
         s.entries = cloneList(a, FeedEntry, result.entries);
-        s.request = result.request.clone();
+        s.request = result.request.clone(a);
         s.errors = cloneList(a, string, result.errors);
         return s;
     }
@@ -43,10 +43,12 @@ pub const Summary = struct {
     pub fn toString(s: *Summary, a: std.mem.Allocator) !string {
         var contents: std.ArrayList(string) = .empty;
         defer contents.deinit(a);
-        try contents.append(a, try std.fmt.allocPrint(a, "{s}\n", .{s.title}));
-        try contents.append(a, try std.fmt.allocPrint(a, "{any}\n", .{s.entries}));
-        try contents.append(a, try std.fmt.allocPrint(a, "{any}\n", .{s.request}));
-        try contents.append(a, try std.fmt.allocPrint(a, "{any}\n", .{s.errors}));
+        var formatted_string = string.init(a, "");
+        defer formatted_string.deinit();
+        try contents.append(a, formatted_string.assign_format("{s}\n", .{s.title}));
+        try contents.append(a, formatted_string.assign_format("{any}\n", .{s.entries}));
+        try contents.append(a, formatted_string.assign_format("{any}\n", .{s.request}));
+        try contents.append(a, formatted_string.assign_format("{any}\n", .{s.errors}));
         return try fromArrayList(&contents, a);
     }
 };
@@ -70,7 +72,7 @@ pub const FeedRequests = struct {
         var copy = s.*;
         copy.requests = a.alloc(FeedRequest, s.requests.len) catch unreachable;
         for (0..s.requests.len) |i| {
-            copy.requests[i] = s.requests[i].clone();
+            copy.requests[i] = s.requests[i].clone(a);
         }
         return copy;
     }
@@ -90,9 +92,9 @@ pub const FeedRequest = struct {
         };
     }
 
-    pub fn clone(s: *const Self) Self {
+    pub fn clone(s: *const Self, a: std.mem.Allocator) Self {
         return Self{
-            .url = s.url.clone(),
+            .url = s.url.clone(a),
             .age_limit_hours = s.age_limit_hours,
             .item_limit = s.item_limit,
         };
@@ -141,13 +143,13 @@ pub const FeedEntry = struct {
         deinit_optional(&s.parsedDate);
     }
 
-    pub fn clone(s: *const Self) !Self {
+    pub fn clone(s: *const Self, a: std.mem.Allocator) !Self {
         var copy = s.*;
-        copy.link = s.link.?.clone();
-        copy.subject = s.subject.?.clone();
-        copy.published = s.published.?.clone();
-        copy.title = s.title.?.clone();
-        copy.parsedDate = s.parsedDate.?.clone();
+        copy.link = s.link.?.clone(a);
+        copy.subject = s.subject.?.clone(a);
+        copy.published = s.published.?.clone(a);
+        copy.title = s.title.?.clone(a);
+        copy.parsedDate = s.parsedDate.?.clone(a);
         return copy;
     }
 
@@ -190,11 +192,11 @@ pub const FeedResult = struct {
     pub fn clone(s: *const Self, a: std.mem.Allocator) Self {
         return Self{
             .allocator = a,
-            .url = if (s.url) |url| url.clone() else null,
+            .url = if (s.url) |url| url.clone(a) else null,
             .status = s.status,
-            .request = s.request.clone(),
+            .request = s.request.clone(a),
             .entries = cloneList(a, FeedEntry, s.entries),
-            .body = if (s.body) |body| body.clone() else null,
+            .body = if (s.body) |body| body.clone(a) else null,
             // Headers are stored as pointers, so this must deep-copy pointed
             // header instances to keep clone/deinit ownership independent.
             .headers = if (s.headers) |headers| cloneList(a, *http.Header, headers) else null,
