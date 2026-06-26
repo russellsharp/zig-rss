@@ -17,4 +17,7 @@
 ### Priorities
 1. Application should use a minimalist design.
 
+### User Guidance
+1. When asked for directions, advice, or debugging, indicate the first problem in any sequence of the subject before writing code.  If code will be changed, prompt the user first.
+
 

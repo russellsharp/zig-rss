@@ -2,7 +2,7 @@ const std = @import("std");
 const cloneList = @import("utilities").cloneList;
 const deinitList = @import("utilities").deinitList;
 const deinitStruct = @import("utilities").deinitStruct;
-const string = []const u8;
+const string = string(u8);
 const http = std.http;
 
 pub const Summary = struct {
@@ -23,7 +23,7 @@ pub const Summary = struct {
         var s = a.create(Summary) catch unreachable;
         // Prefer the resolved response URL when available (after redirects);
         // otherwise preserve the original request URL for traceability.
-        s.title = a.dupe(u8, result.url orelse result.request.url) catch unreachable;
+        s.title = if (!result.url.empty()) result.url.clone() else result.request.url.clone() catch unreachable;
         s.entries = cloneList(a, FeedEntry, result.entries);
         s.request = result.request.clone(a);
         s.errors = cloneList(a, string, result.errors);
