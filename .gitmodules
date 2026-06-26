@@ -1,0 +1,3 @@
+[submodule "rss/src/string"]
+	path = rss/src/string
+	url = https://github.com/russellsharp/string.git
