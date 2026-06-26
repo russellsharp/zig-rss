@@ -9,6 +9,7 @@ const feedRequest = structs.FeedRequest;
 const feedEntry = structs.FeedEntry;
 const summary = structs.Summary;
 const time = @import("utilities").time;
+const string = @import("string").string(u8);
 const deinitList = @import("utilities").deinitList;
 
 pub const Client = struct {
@@ -38,14 +39,14 @@ pub const Client = struct {
     }
 
     fn buildUri(s: *Self, request: feedRequest) !std.Uri {
-        return std.Uri.parse(request.url) catch |err| {
+        return std.Uri.parse(@constCast(&request.url).str()) catch |err| {
             switch (err) {
                 error.InvalidFormat, error.UnexpectedCharacter => {
-                    log(s, .Error, "Error during parsing of\n\turl: {s}\n\terror: {s}", .{ request.url, @errorName(err) });
+                    log(s, .Error, "Error during parsing of\n\turl: {s}\n\terror: {s}", .{ request.url.str(), @errorName(err) });
                     return err;
                 },
                 error.InvalidPort, error.InvalidHostName => {
-                    log(s, .Error, "Invalid host or port given:{s} \n\t{s}", .{ request.url, @errorName(err) });
+                    log(s, .Error, "Invalid host or port given:{s} \n\t{s}", .{ request.url.str(), @errorName(err) });
                     return err;
                 },
             }
@@ -66,12 +67,12 @@ pub const Client = struct {
 
     fn buildResult(s: *Self, response: std.http.Client.FetchResult, body: *std.Io.Writer.Allocating, request: feedRequest) !feedResult {
         var res: feedResult = .init(s.a);
-        res.body = try std.fmt.allocPrint(s.a, "{s}", .{body.written()});
+        res.body = string.init(s.a, body.written());
         res.status = response.status;
-        res.url = try s.a.dupe(u8, request.url);
+        res.url = request.url.clone();
         res.headers = .empty;
         res.errors = .empty;
-        res.request = request.clone(s.a);
+        res.request = request.clone();
 
         const entries = parseResponse(res, s.a, s.io, s.logger) catch |err| blk: {
             std.debug.print("Error while parsing response: {any}\n", .{@errorName(err)});
@@ -79,7 +80,7 @@ pub const Client = struct {
         };
 
         for (entries.items) |item| {
-            try res.entries.append(s.a, try item.clone(s.a));
+            try res.entries.append(s.a, try item.clone());
         }
         return res;
     }
@@ -100,7 +101,8 @@ pub const Client = struct {
 
         if (result.body == null) return entries;
 
-        var static_reader: xml.Reader.Static = .init(a, result.body orelse "", .{});
+        const body = try a.dupe(string.contained_type, if (result.body) |body| body.str() else "");
+        var static_reader: xml.Reader.Static = .init(a, body, .{});
         defer static_reader.deinit();
         const reader = &static_reader.interface;
 
@@ -117,40 +119,43 @@ pub const Client = struct {
                         // Reset entry state at the start of each <item> so fields
                         // from previous items cannot leak into the next record.
                         itemOpened = true;
-                        entry = .init(a, "", "", "", "", "");
-                        errdefer entry.deinit(a);
+                        entry = .init_empty(a);
+                        errdefer entry.deinit();
                     } else if (std.ascii.eqlIgnoreCase("title", elementName) and itemOpened) {
-                        entry.title = try reader.readElementTextAlloc(a);
+                        _ = entry.title.?.assign(try reader.readElementTextAlloc(a));
                         continue;
                     } else if (std.ascii.eqlIgnoreCase("description", elementName) and itemOpened) {
-                        entry.subject = try reader.readElementTextAlloc(a);
+                        _ = entry.subject.?.assign(try reader.readElementTextAlloc(a));
                         continue;
                     } else if (std.ascii.eqlIgnoreCase("link", elementName) and itemOpened) {
-                        entry.link = try reader.readElementTextAlloc(a);
+                        _ = entry.link.?.assign(try reader.readElementTextAlloc(a));
                         continue;
                     } else if (itemOpened and std.ascii.eqlIgnoreCase("enclosure", elementName)) {
                         if (reader.attributes.get("url")) |attribute_index| {
-                            entry.link = try a.dupe(u8, try reader.attributeValue(attribute_index));
+                            _ = entry.link.?.assign(try reader.attributeValue(attribute_index));
                         }
                         continue;
                     } else if (std.ascii.eqlIgnoreCase("pubDate", elementName) and itemOpened) {
                         // entry.published = getElementContents(a, "pubDate", reader.buf);
-                        entry.published = try reader.readElementTextAlloc(a);
-                        const dt = time.parseDateTime(entry.published.?) catch |err| {
-                            try l.format(.Error, "ERROR: {s} -> {any}\n", .{ entry.published.?, err }, @typeName(@This()));
+                        _ = entry.published.?.assign(try reader.readElementTextAlloc(a));
+                        const dt = time.parseDateTime(entry.published.?.str()) catch |err| {
+                            try l.format(.Error, "ERROR: {s} -> {any}\n", .{ entry.published.?.str(), err }, @typeName(@This()));
                             return err;
                         };
 
                         const tz_sign: u8 = if (dt.timezone >= 0) '+' else '-';
                         const tz_value = @abs(dt.timezone);
 
-                        const iso8601 = try std.fmt.allocPrint(
-                            a,
-                            "{}-{:0>2}-{:0>2}T{:0>2}:{:0>2}:{:0>2}.{:0>3}{c}{:0>4}",
-                            .{ dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, dt.millisecond, tz_sign, tz_value },
-                        );
-                        defer a.free(iso8601);
-                        entry.parsedDate = try a.dupe(u8, iso8601);
+                        // const iso8601 = try std.fmt.allocPrint(
+                        //     a,
+                        //     "{}-{:0>2}-{:0>2}T{:0>2}:{:0>2}:{:0>2}.{:0>3}{c}{:0>4}",
+                        //     .{ dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, dt.millisecond, tz_sign, tz_value },
+                        // );
+                        // defer a.free(iso8601);
+
+                        const format = "{}-{:0>2}-{:0>2}T{:0>2}:{:0>2}:{:0>2}.{:0>3}{c}{:0>4}";
+                        const args = .{ dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, dt.millisecond, tz_sign, tz_value };
+                        _ = entry.parsedDate.?.assign_format(format, args);
                         continue;
                     }
                 }
@@ -161,7 +166,7 @@ pub const Client = struct {
                     itemCount += 1;
 
                     const now = std.Io.Clock.now(.real, io).toSeconds();
-                    const publishedDt = try time.parseDateTime(entry.published);
+                    const publishedDt = try time.parseDateTime(entry.published.?.str());
                     const publishedUnix: i64 = @intCast(time.dateTimeToUnixUtc(publishedDt));
                     const ageHours = time.differenceHours(publishedUnix, now);
 
@@ -170,7 +175,7 @@ pub const Client = struct {
                         try entries.append(a, entry);
                     } else {
                         //if we don't include the entry, we clean it up
-                        entry.deinit(a);
+                        entry.deinit();
                     }
                 }
             }

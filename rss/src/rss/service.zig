@@ -9,6 +9,7 @@ const summary = structs.Summary;
 const Client = @import("client.zig").Client;
 const utilities = @import("utilities");
 const protectedCollection = utilities.protectedCollection;
+const string = @import("string").string(u8);
 
 const client_name = "test-client-russell";
 
@@ -94,11 +95,11 @@ pub const rss = struct {
 
         const result = cl.pull(request) catch |err| errorCapture: {
             var erredFeed: feedResult = .init(s.a);
-            erredFeed.request = request.clone(s.a);
+            erredFeed.request = request.clone();
             s.log(.Warning, "ERRORED {s}: error while pulling feed.\n", .{@errorName(err)});
             const error_message = std.fmt.allocPrint(s.a, "{s} error while pulling feed.  Bad URL", .{@errorName(err)}) catch unreachable;
             defer s.a.free(error_message);
-            erredFeed.errors.append(s.a, s.a.dupe(u8, error_message) catch unreachable) catch unreachable;
+            erredFeed.errors.append(s.a, string.init(s.a, error_message)) catch unreachable;
             break :errorCapture erredFeed;
         };
         defer result.deinit();

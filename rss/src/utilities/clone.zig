@@ -66,7 +66,7 @@ pub inline fn isArrayList(T: type) bool {
     return std.mem.indexOf(u8, @typeName(input_type), "array_list") != null;
 }
 
-fn cloneElement(a: std.mem.Allocator, T: type, item: T) !T {
+inline fn cloneElement(a: std.mem.Allocator, T: type, item: T) !T {
     if (std.meta.hasFn(T, "clone")) {
         // ArrayList.clone keeps shared backing semantics for nested data; recurse
         // element-wise instead so callers receive a true deep copy.
@@ -76,7 +76,14 @@ fn cloneElement(a: std.mem.Allocator, T: type, item: T) !T {
             const Child = items_info.pointer.child;
             return cloneList(a, Child, item);
         }
-        return item.clone(a);
+        const parameter_info = @typeInfo(@TypeOf(T.clone)).@"fn";
+        {
+            if (parameter_info.params.len > 1) {
+                return item.clone(a);
+            } else {
+                return item.clone();
+            }
+        }
     }
 
     return switch (@typeInfo(T)) {

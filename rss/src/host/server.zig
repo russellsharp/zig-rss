@@ -10,6 +10,7 @@ const tasklist = @import("utilities").tasks.collection;
 const service = @import("rss").Service;
 const rssStructs = @import("rss").Structs;
 const utilities = @import("utilities");
+const string = @import("string").string(u8);
 
 pub const Context = struct {
     host: ?[]u8 = null,
@@ -219,7 +220,6 @@ pub const Server = struct {
                 defer c.a.free(req_body);
 
                 try read_request_body(req_body, req);
-
                 var requests = parse_json(c, rssStructs.FeedRequests, req_body) catch |err| {
                     const response_body = try std.fmt.allocPrint(c.a, "Error {s}: {s}", .{ @errorName(err), req_body });
                     defer c.a.free(response_body);
@@ -263,6 +263,7 @@ pub const Server = struct {
         scanner.enableDiagnostics(&diag);
 
         const options = std.json.ParseOptions{ .ignore_unknown_fields = true, .allocate = .alloc_always };
+
         const parsed = std.json.parseFromTokenSource(T, c.a, &scanner, options) catch |err| {
             log(c, .Error, "Parsing failed at {d}:{d} - {s}\n", .{
                 diag.getLine(),

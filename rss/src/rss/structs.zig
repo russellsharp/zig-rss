@@ -2,8 +2,18 @@ const std = @import("std");
 const cloneList = @import("utilities").cloneList;
 const deinitList = @import("utilities").deinitList;
 const deinitStruct = @import("utilities").deinitStruct;
-const string = string(u8);
+const string = @import("string").string(u8);
 const http = std.http;
+
+fn deinit_optional(field: *const ?string) void {
+    var var_ptr: *?string = @constCast(field);
+    _ = &var_ptr;
+    if (var_ptr.*) |ptr| {
+        _ = &ptr;
+        @constCast(&ptr).deinit();
+    }
+    var_ptr.* = null;
+}
 
 pub const Summary = struct {
     const Self = @This();
@@ -13,7 +23,7 @@ pub const Summary = struct {
     errors: std.ArrayList(string) = .empty,
 
     pub fn deinit(s: *Summary, a: std.mem.Allocator) void {
-        a.free(s.title);
+        s.title.deinit();
         deinitList(s.entries, a);
         deinitStruct(s.request, a);
         deinitList(s.errors, a);
@@ -23,9 +33,9 @@ pub const Summary = struct {
         var s = a.create(Summary) catch unreachable;
         // Prefer the resolved response URL when available (after redirects);
         // otherwise preserve the original request URL for traceability.
-        s.title = if (!result.url.empty()) result.url.clone() else result.request.url.clone() catch unreachable;
+        s.title = if (!result.url.?.empty()) result.url.?.clone() else result.request.url.clone();
         s.entries = cloneList(a, FeedEntry, result.entries);
-        s.request = result.request.clone(a);
+        s.request = result.request.clone();
         s.errors = cloneList(a, string, result.errors);
         return s;
     }
@@ -51,7 +61,7 @@ pub const FeedRequests = struct {
 
     pub fn deinit(s: *Self, a: std.mem.Allocator) void {
         for (s.requests) |*item| {
-            item.deinit(a);
+            item.deinit();
         }
         a.free(s.requests);
     }
@@ -60,7 +70,7 @@ pub const FeedRequests = struct {
         var copy = s.*;
         copy.requests = a.alloc(FeedRequest, s.requests.len) catch unreachable;
         for (0..s.requests.len) |i| {
-            copy.requests[i] = s.requests[i].clone(a);
+            copy.requests[i] = s.requests[i].clone();
         }
         return copy;
     }
@@ -74,22 +84,22 @@ pub const FeedRequest = struct {
 
     pub fn init(a: std.mem.Allocator) Self {
         return Self{
-            .url = a.dupe(u8, "") catch unreachable,
+            .url = string.init(a, ""),
             .age_limit_hours = 0,
             .item_limit = 0,
         };
     }
 
-    pub fn clone(s: *const Self, a: std.mem.Allocator) Self {
+    pub fn clone(s: *const Self) Self {
         return Self{
-            .url = a.dupe(u8, s.url) catch unreachable,
+            .url = s.url.clone(),
             .age_limit_hours = s.age_limit_hours,
             .item_limit = s.item_limit,
         };
     }
 
-    pub fn deinit(s: Self, a: std.mem.Allocator) void {
-        a.free(s.url);
+    pub fn deinit(s: Self) void {
+        @constCast(&s.url).deinit();
     }
 };
 
@@ -104,58 +114,61 @@ pub const FeedEntry = struct {
     pub fn init(a: std.mem.Allocator, link: string, subject: string, published: string, title: string, parsedDate: string) Self {
         var s = a.create(FeedEntry) catch unreachable;
         defer a.destroy(s);
-        s.link = a.dupe(u8, link) catch unreachable;
-        s.subject = a.dupe(u8, subject) catch unreachable;
-        s.published = a.dupe(u8, published) catch unreachable;
-        s.title = a.dupe(u8, title) catch unreachable;
-        s.parsedDate = a.dupe(u8, parsedDate) catch unreachable;
+        s.link = link.clone();
+        s.subject = subject.clone();
+        s.published = published.clone();
+        s.title = title.clone();
+        s.parsedDate = parsedDate.clone();
         return s.*;
     }
 
-    fn free_optional(field: *const ?[]const u8, a: std.mem.Allocator) void {
-        var ptr: *?[]const u8 = @constCast(field);
-        _ = &ptr;
-        if (ptr.*) |field_notnull| {
-            a.free(field_notnull);
-        }
-        ptr.* = null;
-    }
-    pub fn deinit(s: *Self, a: std.mem.Allocator) void {
-        free_optional(&s.link, a);
-        free_optional(&s.subject, a);
-        free_optional(&s.published, a);
-        free_optional(&s.title, a);
-        free_optional(&s.parsedDate, a);
+    pub fn init_empty(a: std.mem.Allocator) Self {
+        var s = a.create(FeedEntry) catch unreachable;
+        defer a.destroy(s);
+        s.link = string.init(a, "");
+        s.subject = string.init(a, "");
+        s.published = string.init(a, "");
+        s.title = string.init(a, "");
+        s.parsedDate = string.init(a, "");
+        return s.*;
     }
 
-    pub fn clone(s: *const Self, a: std.mem.Allocator) !Self {
+    pub fn deinit(s: *Self) void {
+        deinit_optional(&s.link);
+        deinit_optional(&s.subject);
+        deinit_optional(&s.published);
+        deinit_optional(&s.title);
+        deinit_optional(&s.parsedDate);
+    }
+
+    pub fn clone(s: *const Self) !Self {
         var copy = s.*;
-        copy.link = try a.dupe(u8, s.link orelse "");
-        copy.subject = try a.dupe(u8, s.subject orelse "");
-        copy.published = try a.dupe(u8, s.published orelse "");
-        copy.title = try a.dupe(u8, s.title orelse "");
-        copy.parsedDate = try a.dupe(u8, s.parsedDate orelse "");
+        copy.link = s.link.?.clone();
+        copy.subject = s.subject.?.clone();
+        copy.published = s.published.?.clone();
+        copy.title = s.title.?.clone();
+        copy.parsedDate = s.parsedDate.?.clone();
         return copy;
     }
 
     pub fn toString(s: *const Self, a: std.mem.Allocator) !string {
         var contents: std.ArrayList(string) = .empty;
         defer contents.deinit(a);
-        try contents.append(a, try std.fmt.allocPrint(a, "{s}\n", .{s.link}));
-        try contents.append(a, try std.fmt.allocPrint(a, "{s}\n", .{s.subject}));
-        try contents.append(a, try std.fmt.allocPrint(a, "{s}\n", .{s.published}));
-        try contents.append(a, try std.fmt.allocPrint(a, "{s}\n", .{s.title}));
-        try contents.append(a, try std.fmt.allocPrint(a, "{s}\n", .{s.parsedDate.?}));
+        try contents.append(a, try std.fmt.allocPrint(a, "{s}\n", .{s.link.?.str()}));
+        try contents.append(a, try std.fmt.allocPrint(a, "{s}\n", .{s.subject.?.str()}));
+        try contents.append(a, try std.fmt.allocPrint(a, "{s}\n", .{s.published.?.str()}));
+        try contents.append(a, try std.fmt.allocPrint(a, "{s}\n", .{s.title.?.str()}));
+        try contents.append(a, try std.fmt.allocPrint(a, "{s}\n", .{s.parsedDate.?.str()}));
         return try fromArrayList(&contents, a);
     }
 };
 
 pub const FeedResult = struct {
     const Self = @This();
-    allocator: std.mem.Allocator = std.heap.page_allocator,
+    allocator: std.mem.Allocator = undefined,
     url: ?string = null,
     status: http.Status = .ok,
-    request: FeedRequest = .init(std.heap.page_allocator),
+    request: FeedRequest = undefined,
     entries: std.ArrayList(FeedEntry) = .empty,
     body: ?string = null,
     headers: ?std.ArrayList(*http.Header) = null,
@@ -177,11 +190,11 @@ pub const FeedResult = struct {
     pub fn clone(s: *const Self, a: std.mem.Allocator) Self {
         return Self{
             .allocator = a,
-            .url = if (s.url) |url| a.dupe(u8, url) catch unreachable else null,
+            .url = if (s.url) |url| url.clone() else null,
             .status = s.status,
-            .request = s.request.clone(a),
+            .request = s.request.clone(),
             .entries = cloneList(a, FeedEntry, s.entries),
-            .body = if (s.body) |body| a.dupe(u8, body) catch unreachable else null,
+            .body = if (s.body) |body| body.clone() else null,
             // Headers are stored as pointers, so this must deep-copy pointed
             // header instances to keep clone/deinit ownership independent.
             .headers = if (s.headers) |headers| cloneList(a, *http.Header, headers) else null,
@@ -191,11 +204,12 @@ pub const FeedResult = struct {
 
     pub fn deinit(s: *const Self) void {
         const a = s.allocator;
-        if (s.url) |url| a.free(url);
-        s.request.deinit(a);
+        deinit_optional(&s.url);
+        s.request.deinit();
         deinitList(s.entries, a);
 
-        if (s.body) |body| a.free(body);
+        deinit_optional(&s.body);
+
         if (s.headers) |headers| {
             for (headers.items) |header| {
                 a.free(header.name);
