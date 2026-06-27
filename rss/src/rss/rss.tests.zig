@@ -1,6 +1,6 @@
 const std = @import("std");
 const cloneList = @import("utilities").cloneList;
-
+const string = @import("string").string(u8);
 const structs = @import("rss.zig").Structs;
 
 test "copy ArrayList(feedResult)  098t0ah" {
@@ -8,11 +8,11 @@ test "copy ArrayList(feedResult)  098t0ah" {
     const T = structs.FeedResult;
 
     const tester: structs.FeedResult = .{
-        .url = try a.dupe(u8, "hello"),
+        .url = string.init(a, "hello"),
         .status = .ok,
         .request = .init(a),
         .entries = .empty,
-        .body = try a.dupe(u8, "body"),
+        .body = string.init(a, "body"),
         .headers = null,
         .errors = .empty,
     };
@@ -33,13 +33,13 @@ test "copy ArrayList(feedResult)  098t0ah" {
 
     list_1 = cloneList(a, T, list_0);
 
-    try std.testing.expectEqualStrings("hello", list_0.items[0].url.?);
-    try std.testing.expectEqualStrings("hello", list_1.items[0].url.?);
-    try std.testing.expectEqualStrings("body", list_0.items[0].body.?);
-    try std.testing.expectEqualStrings("body", list_1.items[0].body.?);
+    try std.testing.expectEqualStrings("hello", list_0.items[0].url.?.str());
+    try std.testing.expectEqualStrings("hello", list_1.items[0].url.?.str());
+    try std.testing.expectEqualStrings("body", list_0.items[0].body.?.str());
+    try std.testing.expectEqualStrings("body", list_1.items[0].body.?.str());
     try std.testing.expectEqual(@intFromEnum(std.http.Status.ok), @intFromEnum(list_0.items[0].status));
     try std.testing.expectEqual(@intFromEnum(std.http.Status.ok), @intFromEnum(list_1.items[0].status));
 
-    try std.testing.expect(list_0.items[0].url.?.ptr != list_1.items[0].url.?.ptr);
-    try std.testing.expect(list_0.items[0].body.?.ptr != list_1.items[0].body.?.ptr);
+    try std.testing.expect(list_0.items[0].url.?.str().ptr != list_1.items[0].url.?.str().ptr);
+    try std.testing.expect(list_0.items[0].body.?.str().ptr != list_1.items[0].body.?.str().ptr);
 }

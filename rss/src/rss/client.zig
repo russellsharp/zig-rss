@@ -18,12 +18,12 @@ pub const Client = struct {
     cl: http.Client = undefined,
     a: std.mem.Allocator,
     io: std.Io,
-    client_name: []const u8,
+    client_name: string,
     logger: *logger.Logger,
 
-    pub fn init(s: *Self, a: std.mem.Allocator, io: std.Io, name: []const u8, l: *logger.Logger) !void {
+    pub fn init(s: *Self, a: std.mem.Allocator, io: std.Io, name: string, l: *logger.Logger) !void {
         s.a = a;
-        s.client_name = try a.dupe(u8, name);
+        s.client_name = name.clone(a);
         s.cl = http.Client{ .allocator = a, .io = io };
         s.io = io;
         s.logger = l;
@@ -31,7 +31,7 @@ pub const Client = struct {
 
     pub fn deinit(s: *Self) void {
         s.cl.deinit();
-        s.a.free(s.client_name);
+        s.client_name.deinit();
     }
 
     fn log(s: *Self, level: logger.Level, comptime msg: []const u8, fmt: anytype) void {
@@ -72,6 +72,7 @@ pub const Client = struct {
         res.url = request.url.clone(s.a);
         res.headers = .empty;
         res.errors = .empty;
+        res.request.deinit();
         res.request = request.clone(s.a);
 
         const entries = parseResponse(res, s.a, s.io, s.logger) catch |err| blk: {
@@ -102,6 +103,7 @@ pub const Client = struct {
         if (result.body == null) return entries;
 
         const body = try a.dupe(string.contained_type, if (result.body) |body| body.str() else "");
+        defer a.free(body);
         var static_reader: xml.Reader.Static = .init(a, body, .{});
         defer static_reader.deinit();
         const reader = &static_reader.interface;
@@ -122,22 +124,31 @@ pub const Client = struct {
                         entry = .init_empty(a);
                         errdefer entry.deinit();
                     } else if (std.ascii.eqlIgnoreCase("title", elementName) and itemOpened) {
-                        _ = entry.title.?.assign(try reader.readElementTextAlloc(a));
+                        const buffer = try reader.readElementTextAlloc(a);
+                        defer a.free(buffer);
+                        _ = entry.title.?.assign(buffer);
                         continue;
                     } else if (std.ascii.eqlIgnoreCase("description", elementName) and itemOpened) {
-                        _ = entry.subject.?.assign(try reader.readElementTextAlloc(a));
+                        const buffer = try reader.readElementTextAlloc(a);
+                        defer a.free(buffer);
+                        _ = entry.subject.?.assign(buffer);
                         continue;
                     } else if (std.ascii.eqlIgnoreCase("link", elementName) and itemOpened) {
-                        _ = entry.link.?.assign(try reader.readElementTextAlloc(a));
+                        const buffer = try reader.readElementTextAlloc(a);
+                        defer a.free(buffer);
+                        _ = entry.link.?.assign(buffer);
                         continue;
                     } else if (itemOpened and std.ascii.eqlIgnoreCase("enclosure", elementName)) {
                         if (reader.attributes.get("url")) |attribute_index| {
-                            _ = entry.link.?.assign(try reader.attributeValue(attribute_index));
+                            const buffer = try reader.attributeValue(attribute_index);
+                            defer a.free(buffer);
+                            _ = entry.link.?.assign(buffer);
                         }
                         continue;
                     } else if (std.ascii.eqlIgnoreCase("pubDate", elementName) and itemOpened) {
-                        // entry.published = getElementContents(a, "pubDate", reader.buf);
-                        _ = entry.published.?.assign(try reader.readElementTextAlloc(a));
+                        const buffer = try reader.readElementTextAlloc(a);
+                        defer a.free(buffer);
+                        _ = entry.published.?.assign(buffer);
                         const dt = time.parseDateTime(entry.published.?.str()) catch |err| {
                             try l.format(.Error, "ERROR: {s} -> {any}\n", .{ entry.published.?.str(), err }, @typeName(@This()));
                             return err;
@@ -182,19 +193,23 @@ pub const Client = struct {
     // Extracts text between the first matching open/close tag pair in buffer.
     // Does not handle nested tags, CDATA sections, or namespace prefixes; assumes
     // well-formed flat RSS fields such as <title>, <link>, and <description>.
-    fn getElementContents(a: std.mem.Allocator, elementName: []const u8, buffer: []const u8) ?[]const u8 {
+    fn getElementContents(a: std.mem.Allocator, elementName: string, buffer: string) ?string {
+        defer @constCast(&elementName).deinit();
+        defer @constCast(&buffer).deinit();
         // const whitespace = " \t\n\r";
-        const opening = std.fmt.allocPrint(a, "<{s}>", .{elementName}) catch unreachable;
-        defer a.free(opening);
-        const closing = std.fmt.allocPrint(a, "</{s}>", .{elementName}) catch unreachable;
-        defer a.free(closing);
-        const contents_start: usize = opening.len;
-        const closing_bracket = std.mem.find(u8, buffer[contents_start..], closing);
-        if (closing_bracket != null) {
-            const contents_end: usize = contents_start + @min(closing_bracket.?, buffer.len);
-            return a.dupe(u8, buffer[contents_start..contents_end]) catch unreachable;
+        const opening = string.from_format(a, "<{s}>", .{elementName.str()});
+        defer @constCast(&opening).deinit();
+        const closing = string.from_format(a, "</{s}>", .{elementName.str()});
+        defer @constCast(&closing).deinit();
+        const contents_start: usize = opening.length();
+
+        const closing_bracket: i64 = @intCast(buffer.find(closing.str(), contents_start, string.npos) catch unreachable);
+
+        if (closing_bracket != string.npos) {
+            const contents_end: usize = @min(@as(usize, @intCast(closing_bracket)), buffer.length());
+            return buffer.init_substr(a, contents_start, @intCast(contents_end - contents_start));
         } else {
-            return null; //a.dupe(u8, "bad data") catch unreachable;
+            return null;
         }
     }
 };
@@ -212,24 +227,25 @@ fn testLogger(a: std.mem.Allocator, io: std.Io) !*logger.Logger {
 test "getElementContents returns text between matching tags" {
     const a = std.testing.allocator;
 
-    const text = Client.getElementContents(a, "title", "<title>Hello</title>");
-    defer if (text != null and text.?.len > 0) a.free(text.?);
+    const text = Client.getElementContents(a, string.init(a, "title"), string.init(a, "<title>Hello</title>"));
+    defer if (text != null) @constCast(&text.?).deinit();
 
-    try std.testing.expectEqualStrings("Hello", text.?);
+    try std.testing.expectEqualStrings("Hello", text.?.str());
 }
 
 test "getElementContents returns nu8ll string when closing tag absent" {
     const a = std.testing.allocator;
 
-    const text = Client.getElementContents(a, "title", "<title>Hello");
+    const text = Client.getElementContents(a, string.init(a, "title"), string.init(a, "<title>Hello"));
     try std.testing.expect(text == null);
 }
 
 test "getElementContents returns empty string for empty element" {
     const a = std.testing.allocator;
 
-    const text = Client.getElementContents(a, "title", "<title></title>");
-    try std.testing.expectEqualStrings("", text.?);
+    const text = Client.getElementContents(a, string.init(a, "title"), string.init(a, "<title></title>"));
+    defer @constCast(&text.?).deinit();
+    try std.testing.expectEqualStrings("", text.?.str());
 }
 
 test "parseResponse extracts entries from minimal RSS XML" {
@@ -238,24 +254,22 @@ test "parseResponse extracts entries from minimal RSS XML" {
     const l = try testLogger(a, io);
     defer l.deinit();
 
-    const req = feedRequest{ .url = try a.dupe(u8, "https://example.com/feed"), .age_limit_hours = 0, .item_limit = 5 };
-    defer @constCast(&req).deinit(a);
+    const req = feedRequest{ .url = .init(a, "https://example.com/feed"), .age_limit_hours = 0, .item_limit = 5 };
+    defer @constCast(&req).deinit();
 
     var result: feedResult = .init(a);
     defer result.deinit();
+    result.request.deinit();
     result.request = req.clone(a);
-    result.body = try a.dupe(
-        u8,
-        "<rss><channel><item><title>T1</title><description>D1</description><link>L1</link><pubDate>Fri, 17 Apr 2026 08:00:00 -0400</pubDate></item></channel></rss>",
-    );
+    result.body = string.init(a, "<rss><channel><item><title>T1</title><description>D1</description><link>L1</link><pubDate>Fri, 17 Apr 2026 08:00:00 -0400</pubDate></item></channel></rss>");
 
     var entries = try Client.parseResponse(result, a, io, l);
     defer deinitEntries(&entries, a);
 
     try std.testing.expectEqual(@as(usize, 1), entries.items.len);
-    try std.testing.expectEqualStrings("T1", entries.items[0].title.?);
-    try std.testing.expectEqualStrings("D1", entries.items[0].subject.?);
-    try std.testing.expectEqualStrings("L1", entries.items[0].link.?);
+    try std.testing.expectEqualStrings("T1", entries.items[0].title.?.str());
+    try std.testing.expectEqualStrings("D1", entries.items[0].subject.?.str());
+    try std.testing.expectEqualStrings("L1", entries.items[0].link.?.str());
     try std.testing.expect(entries.items[0].parsedDate != null);
 }
 
@@ -265,14 +279,15 @@ test "parseResponse item_limit stops reading after N entries" {
     const l = try testLogger(a, io);
     defer l.deinit();
 
-    const req = feedRequest{ .url = try a.dupe(u8, "https://example.com/feed"), .age_limit_hours = 0, .item_limit = 2 };
-    defer @constCast(&req).deinit(a);
+    const req = feedRequest{ .url = string.init(a, "https://example.com/feed"), .age_limit_hours = 0, .item_limit = 2 };
+    defer @constCast(&req).deinit();
 
     var result: feedResult = .init(a);
     defer result.deinit();
+    result.request.deinit();
     result.request = req.clone(a);
-    result.body = try a.dupe(
-        u8,
+    result.body = string.init(
+        a,
         "<rss><channel>" ++
             "<item><title>A</title><description>A</description><link>A</link><pubDate>Fri, 17 Apr 2026 08:00:00 -0400</pubDate></item>" ++
             "<item><title>B</title><description>B</description><link>B</link><pubDate>Fri, 17 Apr 2026 09:00:00 -0400</pubDate></item>" ++
@@ -284,8 +299,8 @@ test "parseResponse item_limit stops reading after N entries" {
     defer deinitEntries(&entries, a);
 
     try std.testing.expectEqual(@as(usize, 2), entries.items.len);
-    try std.testing.expectEqualStrings("A", entries.items[0].title.?);
-    try std.testing.expectEqualStrings("B", entries.items[1].title.?);
+    try std.testing.expectEqualStrings("A", entries.items[0].title.?.str());
+    try std.testing.expectEqualStrings("B", entries.items[1].title.?.str());
 }
 
 test "parseResponse age_limit_hours 0 disables age filter" {
@@ -294,14 +309,15 @@ test "parseResponse age_limit_hours 0 disables age filter" {
     const l = try testLogger(a, io);
     defer l.deinit();
 
-    const req = feedRequest{ .url = try a.dupe(u8, "https://example.com/feed"), .age_limit_hours = 0, .item_limit = 5 };
-    defer @constCast(&req).deinit(a);
+    const req = feedRequest{ .url = string.init(a, "https://example.com/feed"), .age_limit_hours = 0, .item_limit = 5 };
+    defer @constCast(&req).deinit();
 
     var result: feedResult = .init(a);
     defer result.deinit();
+    result.request.deinit();
     result.request = req.clone(a);
-    result.body = try a.dupe(
-        u8,
+    result.body = string.init(
+        a,
         "<rss><channel><item><title>Old</title><description>Old</description><link>Old</link><pubDate>Sat, 01 Jan 2000 00:00:00 +0000</pubDate></item></channel></rss>",
     );
 
@@ -320,14 +336,15 @@ test "parseResponse excludes entries older than age_limit_hours" {
     const l = try testLogger(a, io);
     defer l.deinit();
 
-    const req = feedRequest{ .url = try a.dupe(u8, "https://example.com/feed"), .age_limit_hours = 1, .item_limit = 5 };
-    defer @constCast(&req).deinit(a);
+    const req = feedRequest{ .url = string.init(a, "https://example.com/feed"), .age_limit_hours = 1, .item_limit = 5 };
+    defer @constCast(&req).deinit();
 
     var result: feedResult = .init(a);
     defer result.deinit();
+    result.request.deinit();
     result.request = req.clone(a);
-    result.body = try a.dupe(
-        u8,
+    result.body = string.init(
+        a,
         "<rss><channel><item><title>Old</title><description>Old</description><link>Old</link><pubDate>Sat, 01 Jan 2000 00:00:00 +0000</pubDate></item></channel></rss>",
     );
 
@@ -346,14 +363,15 @@ test "parseResponse field isolation between items" {
     const l = try testLogger(a, io);
     defer l.deinit();
 
-    const req = feedRequest{ .url = try a.dupe(u8, "https://example.com/feed"), .age_limit_hours = 0, .item_limit = 5 };
-    defer @constCast(&req).deinit(a);
+    const req = feedRequest{ .url = string.init(a, "https://example.com/feed"), .age_limit_hours = 0, .item_limit = 5 };
+    defer @constCast(&req).deinit();
 
     var result: feedResult = .init(a);
     defer result.deinit();
+    result.request.deinit();
     result.request = req.clone(a);
-    result.body = try a.dupe(
-        u8,
+    result.body = string.init(
+        a,
         "<rss><channel>" ++
             "<item><title>One</title><description>D1</description><link>L1</link><pubDate>Fri, 17 Apr 2026 08:00:00 -0400</pubDate></item>" ++
             "<item><title>Two</title><description>D2</description><pubDate>Fri, 17 Apr 2026 09:00:00 -0400</pubDate></item>" ++
@@ -367,8 +385,8 @@ test "parseResponse field isolation between items" {
     defer deinitEntries(&entries, a);
 
     try std.testing.expectEqual(@as(usize, 2), entries.items.len);
-    try std.testing.expectEqualStrings("L1", entries.items[0].link.?);
-    try std.testing.expectEqualStrings("", entries.items[1].link.?);
+    try std.testing.expectEqualStrings("L1", entries.items[0].link.?.str());
+    try std.testing.expectEqualStrings("", entries.items[1].link.?.str());
 }
 
 test "parseResponse returns empty list for null body" {
@@ -377,11 +395,12 @@ test "parseResponse returns empty list for null body" {
     const l = try testLogger(a, io);
     defer l.deinit();
 
-    const req = feedRequest{ .url = try a.dupe(u8, "https://example.com/feed"), .age_limit_hours = 0, .item_limit = 5 };
-    defer @constCast(&req).deinit(a);
+    const req = feedRequest{ .url = string.init(a, "https://example.com/feed"), .age_limit_hours = 0, .item_limit = 5 };
+    defer @constCast(&req).deinit();
 
     var result: feedResult = .init(a);
     defer result.deinit();
+    result.request.deinit();
     result.request = req.clone(a);
     result.body = null;
 
@@ -400,13 +419,14 @@ test "parseResponse returns empty list for gibberish body" {
     const l = try testLogger(a, io);
     defer l.deinit();
 
-    const req = feedRequest{ .url = try a.dupe(u8, "https://example.com/feed"), .age_limit_hours = 0, .item_limit = 5 };
-    defer @constCast(&req).deinit(a);
+    const req = feedRequest{ .url = string.init(a, "https://example.com/feed"), .age_limit_hours = 0, .item_limit = 5 };
+    defer @constCast(&req).deinit();
 
     var result: feedResult = .init(a);
     defer result.deinit();
+    result.request.deinit();
     result.request = req.clone(a);
-    result.body = try a.dupe(u8, "2345asd");
+    result.body = string.init(a, "2345asd");
 
     var entries = Client.parseResponse(result, a, io, l) catch |err| blk: {
         std.debug.print("Error while parsing response: {any}\n", .{@errorName(err)});

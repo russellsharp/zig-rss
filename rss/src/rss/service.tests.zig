@@ -2,6 +2,7 @@ const std = @import("std");
 const service = @import("rss.zig").Service;
 const structs = @import("rss.zig").Structs;
 const utilities = @import("utilities");
+const string = @import("string").string(u8);
 
 const logBuilder = utilities.log.buildLogger;
 const feedRequest = structs.FeedRequest;
@@ -20,9 +21,9 @@ test "buildRequest parses json request" {
     defer service_instance.deinit();
 
     var request = try service_instance.buildRequest("{\"url\":\"https://example.com/feed\",\"age_limit_hours\":24,\"item_limit\":5}");
-    defer request.deinit(a);
+    defer request.deinit();
 
-    try std.testing.expectEqualStrings("https://example.com/feed", request.url);
+    try std.testing.expectEqualStrings("https://example.com/feed", request.url.str());
     try std.testing.expectEqual(@as(usize, 24), request.age_limit_hours);
     try std.testing.expectEqual(@as(usize, 5), request.item_limit);
 }
@@ -38,7 +39,7 @@ test "pullFeed captures request errors into the collection" {
     _ = service_instance.init(a, std.testing.io, log);
     defer service_instance.deinit();
 
-    const request = feedRequest{ .url = try a.dupe(u8, "not a url"), .age_limit_hours = 1, .item_limit = 1 };
+    const request = feedRequest{ .url = string.init(a, "not a url"), .age_limit_hours = 1, .item_limit = 1 };
     defer utilities.deinitStruct(request, a);
 
     try service_instance.pullFeed(request);
@@ -53,7 +54,7 @@ test "pullFeed captures request errors into the collection" {
 
     try std.testing.expectEqual(@as(usize, 1), results.items.len);
     try std.testing.expectEqual(@as(usize, 1), results.items[0].errors.items.len);
-    try std.testing.expect(std.mem.indexOf(u8, results.items[0].errors.items[0], "error while pulling feed") != null);
+    try std.testing.expect(try results.items[0].errors.items[0].find("error while pulling feed", 0, string.npos) != string.npos);
 }
 
 test "processRequests returns error summaries for invalid requests" {
@@ -68,9 +69,9 @@ test "processRequests returns error summaries for invalid requests" {
     defer service_instance.deinit();
 
     var request_items = [_]feedRequest{
-        .{ .url = try a.dupe(u8, "not a url"), .age_limit_hours = 0, .item_limit = 1 },
+        .{ .url = string.init(a, "not a url"), .age_limit_hours = 0, .item_limit = 1 },
     };
-    defer for (request_items) |item| @constCast(&item).deinit(a);
+    defer for (request_items) |item| @constCast(&item).deinit();
     const requests = feedRequests{ .requests = request_items[0..] };
 
     var results = try service_instance.processRequests(requests);
@@ -96,8 +97,8 @@ test "toJson serializes summaries without stealing original ownership" {
     _ = service_instance.init(a, std.testing.io, log);
     defer service_instance.deinit();
 
-    var request = feedRequest{ .url = try a.dupe(u8, "https://example.com/feed"), .age_limit_hours = 24, .item_limit = 1 };
-    defer request.deinit(a);
+    var request = feedRequest{ .url = string.init(a, "https://example.com/feed"), .age_limit_hours = 24, .item_limit = 1 };
+    defer request.deinit();
 
     const result = try a.create(feedResult);
     result.* = feedResult.init(a);
@@ -106,10 +107,11 @@ test "toJson serializes summaries without stealing original ownership" {
         a.destroy(result);
     }
 
-    result.url = try a.dupe(u8, request.url);
-    result.body = try a.dupe(u8, "<rss />");
+    result.url = request.url.clone(a);
+    result.body = string.init(a, "<rss />");
+    result.request.deinit();
     result.request = request.clone(a);
-    try result.errors.append(a, try a.dupe(u8, "failure"));
+    try result.errors.append(a, string.init(a, "failure"));
 
     const val = result.*;
     var results = [_]feedResult{val};

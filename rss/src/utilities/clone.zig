@@ -168,8 +168,8 @@ pub fn deinitStruct(item: anytype, a: std.mem.Allocator) void {
     const type_info = @typeInfo(@TypeOf(T.deinit));
     const param_count = type_info.@"fn".params.len;
     if (param_count > 1) {
-        ptr.deinit(a);
+        @constCast(ptr).deinit(a);
     } else {
-        ptr.deinit();
+        @constCast(ptr).deinit();
     }
 }

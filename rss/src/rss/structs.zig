@@ -9,7 +9,6 @@ fn deinit_optional(field: *const ?string) void {
     var var_ptr: *?string = @constCast(field);
     _ = &var_ptr;
     if (var_ptr.*) |ptr| {
-        _ = &ptr;
         @constCast(&ptr).deinit();
     }
     var_ptr.* = null;
@@ -86,7 +85,7 @@ pub const FeedRequest = struct {
 
     pub fn init(a: std.mem.Allocator) Self {
         return Self{
-            .url = string.init(a, ""),
+            .url = .init(a, ""),
             .age_limit_hours = 0,
             .item_limit = 0,
         };
@@ -100,7 +99,7 @@ pub const FeedRequest = struct {
         };
     }
 
-    pub fn deinit(s: Self) void {
+    pub fn deinit(s: *Self) void {
         @constCast(&s.url).deinit();
     }
 };
@@ -116,11 +115,11 @@ pub const FeedEntry = struct {
     pub fn init(a: std.mem.Allocator, link: string, subject: string, published: string, title: string, parsedDate: string) Self {
         var s = a.create(FeedEntry) catch unreachable;
         defer a.destroy(s);
-        s.link = link.clone();
-        s.subject = subject.clone();
-        s.published = published.clone();
-        s.title = title.clone();
-        s.parsedDate = parsedDate.clone();
+        s.link = link.clone(a);
+        s.subject = subject.clone(a);
+        s.published = published.clone(a);
+        s.title = title.clone(a);
+        s.parsedDate = parsedDate.clone(a);
         return s.*;
     }
 
@@ -207,7 +206,7 @@ pub const FeedResult = struct {
     pub fn deinit(s: *const Self) void {
         const a = s.allocator;
         deinit_optional(&s.url);
-        s.request.deinit();
+        @constCast(&s.request).deinit();
         deinitList(s.entries, a);
 
         deinit_optional(&s.body);
