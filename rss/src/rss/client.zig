@@ -124,31 +124,21 @@ pub const Client = struct {
                         entry = .init_empty(a);
                         errdefer entry.deinit();
                     } else if (std.ascii.eqlIgnoreCase("title", elementName) and itemOpened) {
-                        const buffer = try reader.readElementTextAlloc(a);
-                        defer a.free(buffer);
-                        _ = entry.title.?.assign(buffer);
+                        _ = entry.title.?.assign(try reader.readElementText());
                         continue;
                     } else if (std.ascii.eqlIgnoreCase("description", elementName) and itemOpened) {
-                        const buffer = try reader.readElementTextAlloc(a);
-                        defer a.free(buffer);
-                        _ = entry.subject.?.assign(buffer);
+                        _ = entry.subject.?.assign(try reader.readElementText());
                         continue;
                     } else if (std.ascii.eqlIgnoreCase("link", elementName) and itemOpened) {
-                        const buffer = try reader.readElementTextAlloc(a);
-                        defer a.free(buffer);
-                        _ = entry.link.?.assign(buffer);
+                        _ = entry.link.?.assign(try reader.readElementText());
                         continue;
                     } else if (itemOpened and std.ascii.eqlIgnoreCase("enclosure", elementName)) {
                         if (reader.attributes.get("url")) |attribute_index| {
-                            const buffer = try reader.attributeValue(attribute_index);
-                            defer a.free(buffer);
-                            _ = entry.link.?.assign(buffer);
+                            _ = entry.link.?.assign(try reader.attributeValue(attribute_index));
                         }
                         continue;
                     } else if (std.ascii.eqlIgnoreCase("pubDate", elementName) and itemOpened) {
-                        const buffer = try reader.readElementTextAlloc(a);
-                        defer a.free(buffer);
-                        _ = entry.published.?.assign(buffer);
+                        _ = entry.published.?.assign(try reader.readElementText());
                         const dt = time.parseDateTime(entry.published.?.str()) catch |err| {
                             try l.format(.Error, "ERROR: {s} -> {any}\n", .{ entry.published.?.str(), err }, @typeName(@This()));
                             return err;
