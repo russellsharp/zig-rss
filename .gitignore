@@ -10,3 +10,4 @@ obj/
 bin/
 logs/
 *.lscache
+node_modules/**
