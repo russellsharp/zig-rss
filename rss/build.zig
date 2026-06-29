@@ -158,7 +158,7 @@ pub fn build(b: *std.Build) void {
     _ = &module_collection;
     _ = module_collection.append(a, .{ .name = "string", .path = "src/string/src/string.zig", .options = options, .testStepName = "testString", .testStepDescription = "Test for string library." }) catch unreachable;
     _ = module_collection.append(a, .{ .name = "xml", .path = "src/xml/src/xml.zig", .testStepName = "testXml", .testStepDescription = "Tests for xml module." }) catch unreachable;
-    _ = module_collection.append(a, .{ .name = "utilities", .path = "src/utilities/utilities.zig", .options = options, .testStepName = "testUtilities", .testStepDescription = "Tests for utilities module." }) catch unreachable;
+    _ = module_collection.append(a, .{ .name = "utilities", .path = "src/utilities/src/utilities.zig", .options = options, .testStepName = "testUtilities", .testStepDescription = "Tests for utilities module." }) catch unreachable;
     _ = module_collection.append(a, .{ .name = "rss", .path = "src/rss/rss.zig", .dependencies = &.{ "utilities", "xml", "options", "string" }, .options = options, .testStepName = "testRss", .testStepDescription = "Tests for rss module." }) catch unreachable;
     _ = module_collection.append(a, .{ .name = "host", .path = "src/host/host.zig", .dependencies = &.{ "utilities", "rss", "options" }, .options = options, .testStepName = "testHost", .testStepDescription = "Tests for host module." }) catch unreachable;
 

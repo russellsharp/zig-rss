@@ -99,7 +99,9 @@ pub const rss = struct {
             erredFeed.request.deinit();
             erredFeed.request = request.clone(s.a);
             s.log(.Warning, "ERRORED {s}: error while pulling feed.\n", .{@errorName(err)});
-            erredFeed.errors.append(s.a, string.from_format(s.a, "{s} error while pulling feed.  Bad URL", .{@errorName(err)}));
+            erredFeed.errors.append(s.a, string.from_format(s.a, "{s} error while pulling feed.  Bad URL", .{@errorName(err)})) catch {
+                std.debug.print("Could not append error message to collection: {any}\n", .{err});
+            };
             break :errorCapture erredFeed;
         };
         defer result.deinit();
@@ -113,12 +115,7 @@ pub const rss = struct {
         defer out.deinit();
 
         var summaries: std.ArrayList(*summary) = .empty;
-        defer summaries.deinit(s.a);
-        defer utilities.deinitList(summaries);
-        // defer for (summaries.items) |sum| {
-        //     sum.deinit(s.a);
-        //     s.a.destroy(sum);
-        // };
+        defer utilities.deinitList(summaries, s.a);
 
         for (results) |result| {
             const sum = summary.fromFeedResult(s.a, result);
