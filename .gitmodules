@@ -1,3 +1,9 @@
 [submodule "rss/src/string"]
 	path = rss/src/string
 	url = https://github.com/russellsharp/string.git
+[submodule "rss/.src/utilities"]
+	path = rss/.src/utilities
+	url = https://github.com/russellsharp/utilities.git
+[submodule "rss/src/src/utilities"]
+	path = rss/src/src/utilities
+	url = https://github.com/russellsharp/utilities.git
